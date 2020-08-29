@@ -400,7 +400,7 @@ namespace DebuggerTests
         public async Task InspectNullableLocals(string method_name, bool is_async) => await CheckInspectLocalsAtBreakpointSite(
             "DebuggerTests.NullableTests",
             method_name,
-            10,
+            18,
             is_async ? "MoveNext" : method_name,
             $"window.setTimeout(function() {{ invoke_static_method_async('[debugger-test] DebuggerTests.NullableTests:{method_name}'); }}, 1);",
             wait_for_event_fn: async (pause_location) =>
@@ -411,24 +411,95 @@ namespace DebuggerTests
                 {
                     n_int       = TNumber(5),
                     n_int_null  = TObject("System.Nullable<int>", null),
+                    o_n_i       = TNumber(5),
+                    o_n_i_null  = TObject("object", is_null: true),
 
                     n_dt        = TDateTime(dt),
                     n_dt_null   = TObject("System.Nullable<System.DateTime>", null),
+                    o_n_dt      = TDateTime(dt),
+                    o_n_dt_null = TObject("object", null),
 
                     n_gs        = TValueType("DebuggerTests.ValueTypesTest.GenericStruct<int>"),
                     n_gs_null   = TObject("System.Nullable<DebuggerTests.ValueTypesTest.GenericStruct<int>>", null),
+                    o_n_gs      = TValueType("DebuggerTests.ValueTypesTest.GenericStruct<int>"),
+                    o_n_gs_null = TObject("object", null),
+
+                    o_n_ia      = TArray("int[]", 2),
                 }, "locals");
 
                 // check gs
 
-                var n_gs = GetAndAssertObjectWithName(locals, "n_gs");
-                var n_gs_props = await GetProperties(n_gs["value"]?["objectId"]?.Value<string> ());
-                await CheckProps(n_gs_props, new
+                foreach (var name in new[] { "n_gs", "o_n_gs" })
                 {
-                    List        = TObject("System.Collections.Generic.List<int>", is_null: true),
-                    StringField = TString("n_gs#StringField"),
-                    Options     = TEnum  ("DebuggerTests.Options", "None")
-                }, nameof(n_gs));
+                    var gs = GetAndAssertObjectWithName(locals, name);
+                    var gs_props = await GetProperties(gs["value"]?["objectId"]?.Value<string> ());
+                    await CheckProps(gs_props, new
+                    {
+                        List        = TObject("System.Collections.Generic.List<int>", is_null: true),
+                        StringField = TString("n_gs#StringField"),
+                        Options     = TEnum  ("DebuggerTests.Options", "None")
+                    }, name);
+                }
+
+                var o_n_ia_props = await GetObjectOnLocals(locals, "o_n_ia");
+                await CheckProps(o_n_ia_props, new[]
+                {
+                    TNumber(123),
+                    TNumber(671)
+                }, nameof(o_n_ia_props));
+            });
+
+        [Theory]
+        [InlineData("BoxingTest", false)]
+        [InlineData("BoxingTestAsync", true)]
+        public async Task InspectBoxedLocals(string method_name, bool is_async) => await CheckInspectLocalsAtBreakpointSite(
+            "DebuggerTest",
+            method_name,
+            17,
+            is_async ? "MoveNext" : method_name,
+            $"window.setTimeout(function() {{ invoke_static_method_async('[debugger-test] DebuggerTest:{method_name}'); }}, 1);",
+            wait_for_event_fn: async (pause_location) =>
+            {
+                var locals = await GetProperties(pause_location["callFrames"][0]["callFrameId"].Value<string>());
+                var dt = new DateTime(2310, 1, 2, 3, 4, 5);
+                await CheckProps(locals, new
+                {
+                    n_i    = TNumber(5),
+                    o_i    = TNumber(5),
+                    o_n_i  = TNumber(5),
+                    o_s    = TString("foobar"),
+                    o_obj  = TObject("Math"),
+
+                    n_gs   = TValueType("DebuggerTests.ValueTypesTest.GenericStruct<int>"),
+                    o_gs   = TValueType("DebuggerTests.ValueTypesTest.GenericStruct<int>"),
+                    o_n_gs = TValueType("DebuggerTests.ValueTypesTest.GenericStruct<int>"),
+
+                    n_dt   = TDateTime(dt),
+                    o_dt   = TDateTime(dt),
+                    o_n_dt = TDateTime(dt),
+
+                    o_null = TObject("object", is_null: true),
+                    o_ia   = TArray("int[]", 2),
+                }, "locals");
+
+                foreach (var name in new[] { "n_gs", "o_gs", "o_n_gs" })
+                {
+                    var gs = GetAndAssertObjectWithName(locals, name);
+                    var gs_props = await GetProperties(gs["value"]?["objectId"]?.Value<string> ());
+                    await CheckProps(gs_props, new
+                    {
+                        List        = TObject("System.Collections.Generic.List<int>", is_null: true),
+                        StringField = TString("n_gs#StringField"),
+                        Options     = TEnum  ("DebuggerTests.Options", "None")
+                    }, name);
+                }
+
+                var o_ia_props = await GetObjectOnLocals(locals, "o_ia");
+                await CheckProps(o_ia_props, new[]
+                {
+                    TNumber(918),
+                    TNumber(58971)
+                }, nameof(o_ia_props));
             });
 
         [Theory]
@@ -455,12 +526,6 @@ namespace DebuggerTests
                     CheckObject(locals, "list_arr_null_unused", "System.Collections.Generic.Dictionary<Math[], Math.IsMathNull>[]", is_null: true);
                 }
             );
-
-        object TGenericStruct(string typearg, string stringField) => new
-        {
-            List = TObject($"System.Collections.Generic.List<{typearg}>"),
-            StringField = TString(stringField)
-        };
 
         [Fact]
         public async Task RuntimeGetPropertiesWithInvalidScopeIdTest()
@@ -631,7 +696,7 @@ namespace DebuggerTests
                 Assert.Equal(3, props.Count());
                 CheckNumber(props, "A", 10);
                 CheckString(props, "B", "xx");
-                CheckObject(props, "c", "object");
+                CheckString(props, "c", "20_xx");
 
                 // Check UseComplex frame
                 var locals_m1 = await GetLocalsForFrame(pause_location["callFrames"][3], debugger_test_loc, 23, 8, "UseComplex");
@@ -649,7 +714,7 @@ namespace DebuggerTests
                 Assert.Equal(3, props.Count());
                 CheckNumber(props, "A", 10);
                 CheckString(props, "B", "xx");
-                CheckObject(props, "c", "object");
+                CheckString(props, "c", "20_xx");
 
                 pause_location = await StepAndCheck(StepKind.Over, dep_cs_loc, 23, 8, "DoStuff", times: 2);
                 // Check UseComplex frame again
@@ -668,7 +733,7 @@ namespace DebuggerTests
                 Assert.Equal(3, props.Count());
                 CheckNumber(props, "A", 10);
                 CheckString(props, "B", "xx");
-                CheckObject(props, "c", "object");
+                CheckString(props, "c", "20_xx");
             });
         }
 
