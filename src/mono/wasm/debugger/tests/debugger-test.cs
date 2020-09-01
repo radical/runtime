@@ -383,3 +383,34 @@ public class DebuggerTest
         await Task.CompletedTask;
     }
 }
+
+public class MulticastDelegateTestClass
+{
+    event EventHandler<string> TestEvent;
+    MulticastDelegate Delegate;
+
+    public static void run()
+    {
+        var obj = new MulticastDelegateTestClass();
+        obj.Test();
+        obj.TestAsync().Wait();
+    }
+
+    public void Test()
+    {
+        TestEvent += (_, s) => Console.WriteLine (s);
+        TestEvent += (_, s) => Console.WriteLine (s + "qwe");
+        Delegate = TestEvent;
+
+        TestEvent?.Invoke(this, Delegate?.ToString());
+    }
+
+    public async Task TestAsync()
+    {
+        TestEvent += (_, s) => Console.WriteLine (s);
+        TestEvent += (_, s) => Console.WriteLine (s + "qwe");
+        Delegate = TestEvent;
+
+        TestEvent?.Invoke(this, Delegate?.ToString());
+    }
+}
