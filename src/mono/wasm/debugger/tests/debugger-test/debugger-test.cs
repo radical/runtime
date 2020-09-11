@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.IO;
+using System.Runtime.Loader;
 using System.Threading.Tasks;
 public partial class Math
 { //Only append content to this class as the test suite depends on line info
@@ -326,6 +328,15 @@ public class DebuggerTest
     public static void run_all()
     {
         locals();
+    }
+
+    public static void LoadLazyAssembly(string asm_base64, string pdb_base64)
+    {
+        byte[] asm_bytes = Convert.FromBase64String(asm_base64);
+        byte[] pdb_bytes = Convert.FromBase64String(pdb_base64);
+
+        var loadedAssembly = AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(asm_bytes), new MemoryStream(pdb_bytes));
+        Console.WriteLine($"Loaded - {loadedAssembly}");
     }
 
     public static int locals()
