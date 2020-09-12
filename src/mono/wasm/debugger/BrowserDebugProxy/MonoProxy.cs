@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Microsoft.WebAssembly.Diagnostics
@@ -72,7 +73,17 @@ namespace Microsoft.WebAssembly.Diagnostics
                                 }
                                 await RuntimeReady(sessionId, token);
                             }
-
+                            else if (a?[0]?["value"]?.ToString() == MonoConstants.EVENT_RAISED)
+                            {
+                                if (a.Type != JTokenType.Array)
+                                {
+                                    logger.LogDebug("Invalid event raised args, expected an array: {a}");
+                                }
+                                else
+                                {
+                                    await OnJSEventRaised(sessionId, a.Value<JArray>(), token);
+                                }
+                            }
                         }
                         break;
                     }
@@ -98,21 +109,6 @@ namespace Microsoft.WebAssembly.Diagnostics
                     {
                         //TODO figure out how to stich out more frames and, in particular what happens when real wasm is on the stack
                         var top_func = args?["callFrames"]?[0]?["functionName"]?.Value<string>();
-
-                        if (top_func == "mono_wasm_add_lazy_load_files")
-                        {
-                            var loaded_assemblies = await SendMonoCommand(sessionId, MonoCommands.GetLazyLoadedFiles(), token);
-                            var res_val = loaded_assemblies.Value?["result"]?["value"];
-                            var lazy_loaded_files = res_val?.ToObject<string[]>();
-
-                            var context = GetContext(sessionId);
-                            await LoadSourcesFromFiles(sessionId, lazy_loaded_files, token, context);
-
-                            await SendCommand(sessionId, "Debugger.resume", new JObject(), token);
-                            return true;
-
-                        }
-
                         if (top_func == "mono_wasm_fire_bp" || top_func == "_mono_wasm_fire_bp" || top_func == "_mono_wasm_fire_exception")
                         {
                             return await OnPause(sessionId, args, token);
@@ -683,6 +679,58 @@ namespace Microsoft.WebAssembly.Diagnostics
             context.ClearState();
 
             await SendCommand(msg_id, "Debugger.resume", new JObject(), token);
+            return true;
+        }
+
+        async Task<bool> OnJSEventRaised(SessionId sessionId, JArray args, CancellationToken token)
+        {
+            var eventName = args?[1]?["value"]?.Value<string>();
+            if (String.IsNullOrEmpty(eventName))
+            {
+                logger.LogDebug($"Missing name for raised js event: {args}");
+                return false;
+            }
+
+            var eventArgsStr = args?[2]?["value"]?.Value<string>();
+            if (String.IsNullOrEmpty(eventArgsStr))
+            {
+                logger.LogDebug($"Missing args for raised js event: {args}");
+                return false;
+            }
+
+            JObject eventArgs;
+            try
+            {
+                eventArgs = JObject.Parse(eventArgsStr);
+            }
+            catch (JsonReaderException jre)
+            {
+                logger.LogDebug($"Could not parse js event args: {eventArgsStr}. Failed with {jre}");
+                return false;
+            }
+
+            logger.LogDebug($"OnJsEventRaised: name: {eventName}, args: {eventArgs}");
+
+            switch (eventName)
+            {
+                case "AssemblyLoaded":
+                    return await OnAssemblyLoaded(sessionId, eventArgs, token);
+
+                default:
+                {
+                    logger.LogDebug($"Unknown js event name: {eventName} with args {eventArgs}");
+                    return false;
+                }
+            }
+        }
+
+        async Task<bool> OnAssemblyLoaded(SessionId sessionId, JObject eventArgs, CancellationToken token)
+        {
+            var context = GetContext(sessionId);
+            var assemblies = eventArgs?["assemblies"]?.Values<string>()?.ToArray();
+            if (assemblies?.Length > 0)
+                await LoadSourcesFromFiles(sessionId, assemblies, token, context);
+
             return true;
         }
 
