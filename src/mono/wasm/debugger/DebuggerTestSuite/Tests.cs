@@ -1808,15 +1808,8 @@ namespace DebuggerTests
             await Ready();
             await insp.Ready(async (cli, token) =>
             {
-                var source_location = "dotnet://lazy-debugger-test.dll/lazy-debugger-test.cs";
-                // Make sure that we've processed the lazily-loaded assemblies into the debugger
-                var tcs = new TaskCompletionSource<bool>();
-                insp.On("Debugger.resumed", async (args, token) =>
-                {
-                    tcs.SetResult(true);
-                });
-
                 ctx = new DebugTestContext(cli, insp, token, scripts);
+                var source_location = "dotnet://lazy-debugger-test.dll/lazy-debugger-test.cs";
 
                 // Simulate loading an assembly into the framework
                 byte[] bytes = File.ReadAllBytes("../../../lazy-debugger-test/wasm/Debug/lazy-debugger-test.dll");
@@ -1833,12 +1826,14 @@ namespace DebuggerTests
                 // Simulate calling into lazy-loaded code
                 var load_pdbs = JObject.FromObject(new
                 {
-                    expression = "window.setTimeout(function() { invoke_load_lazy_assembly(); }, 1);",
+	                expression = "MONO.mono_wasm_raise_event('AssemblyLoaded', { assemblies: [ 'http://localhost:9400/lazy-debugger-test.dll', 'http://localhost:9400/lazy-debugger-test.pdb' ] })"
                 });
                 var load_pdbs_res = await cli.SendCommand("Runtime.evaluate", load_pdbs, token);
                 Assert.True(load_pdbs_res.IsOk);
 
-                await Task.WhenAny(tcs.Task, Task.Delay(2000));
+                await Task.Delay(2000);
+
+                // await Task.WhenAny(tcs.Task, Task.Delay(2000));
                 Assert.Contains(source_location, scripts.Values);
 
                 await SetBreakpoint(source_location, 9, 8);
