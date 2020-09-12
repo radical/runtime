@@ -83,6 +83,8 @@ namespace Microsoft.WebAssembly.Diagnostics
                                 {
                                     await OnJSEventRaised(sessionId, a.Value<JArray>(), token);
                                 }
+
+                                return true;
                             }
                         }
                         break;
