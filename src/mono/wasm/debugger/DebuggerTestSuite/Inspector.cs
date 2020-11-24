@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using Microsoft.WebAssembly.Diagnostics;
 using Newtonsoft.Json.Linq;
 
@@ -37,8 +38,15 @@ namespace DebuggerTests
             _cancellationTokenSource = new CancellationTokenSource();
             Token = _cancellationTokenSource.Token;
 
-            _loggerFactory = LoggerFactory.Create(
-                builder => builder.AddConsole().AddFilter(null, LogLevel.Trace));
+            _loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddSimpleConsole(c =>
+                {
+                    c.ColorBehavior = LoggerColorBehavior.Enabled;
+                    c.TimestampFormat = "[HH:mm:ss.fff] ";
+                    c.SingleLine = true;
+                });
+            });
 
             Client = new InspectorClient(_loggerFactory.CreateLogger<InspectorClient>());
             _logger = _loggerFactory.CreateLogger<Inspector>();
