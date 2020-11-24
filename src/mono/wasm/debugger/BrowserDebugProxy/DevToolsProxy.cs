@@ -28,10 +28,12 @@ namespace Microsoft.WebAssembly.Diagnostics
         private List<DevToolsQueue> queues = new List<DevToolsQueue>();
 
         protected readonly ILogger logger;
+        protected readonly string _id;
 
-        public DevToolsProxy(ILoggerFactory loggerFactory)
+        public DevToolsProxy(string id, ILoggerFactory loggerFactory)
         {
-            logger = loggerFactory.CreateLogger<DevToolsProxy>();
+            _id = id;
+            logger = loggerFactory.CreateLogger($"{typeof(DevToolsProxy)}-{_id}");
         }
 
         protected virtual Task<bool> AcceptEvent(SessionId sessionId, string method, JObject args, CancellationToken token)

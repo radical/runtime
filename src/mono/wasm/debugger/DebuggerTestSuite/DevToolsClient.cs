@@ -20,12 +20,14 @@ namespace Microsoft.WebAssembly.Diagnostics
         TaskCompletionSource _shutdownRequested = new TaskCompletionSource();
         TaskCompletionSource _newSendTaskAvailable = new ();
         protected readonly ILogger logger;
+        protected readonly string _id;
 
         public event EventHandler<(RunLoopStopReason reason, Exception ex)> RunLoopStopped;
 
-        public DevToolsClient(ILogger logger)
+        public DevToolsClient(string id, ILogger logger)
         {
             this.logger = logger;
+            _id = id;
         }
 
         ~DevToolsClient()

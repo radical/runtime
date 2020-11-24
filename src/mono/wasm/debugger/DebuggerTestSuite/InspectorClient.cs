@@ -17,7 +17,7 @@ namespace Microsoft.WebAssembly.Diagnostics
         Func<string, JObject, CancellationToken, Task> onEvent;
         int next_cmd_id;
 
-        public InspectorClient(ILogger logger) : base(logger) { }
+        public InspectorClient(string id, ILogger logger) : base(id, logger) { }
 
         Task HandleMessage(string msg, CancellationToken token)
         {

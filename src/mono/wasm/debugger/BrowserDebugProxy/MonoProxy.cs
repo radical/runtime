@@ -26,7 +26,7 @@ namespace Microsoft.WebAssembly.Diagnostics
         private HashSet<SessionId> sessions = new HashSet<SessionId>();
         private Dictionary<SessionId, ExecutionContext> contexts = new Dictionary<SessionId, ExecutionContext>();
 
-        public MonoProxy(ILoggerFactory loggerFactory, IList<string> urlSymbolServerList) : base(loggerFactory)
+        public MonoProxy(ILoggerFactory loggerFactory, IList<string> urlSymbolServerList, string id = "unknown") : base(id, loggerFactory)
         {
             this.urlSymbolServerList = urlSymbolServerList ?? new List<string>();
         }

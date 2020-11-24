@@ -30,6 +30,7 @@ namespace DebuggerTests
         public bool UseCallFunctionOnBeforeGetProperties;
 
         static string s_debuggerTestAppPath;
+        static int s_nextId;
         protected static string DebuggerTestAppPath
         {
             get
@@ -77,9 +78,12 @@ namespace DebuggerTests
             throw new Exception("Could not find an installed Chrome to use");
         }
 
+        public string Id { get; init; }
+
         public DebuggerTestBase(string driver = "debugger-driver.html")
         {
-            insp = new Inspector();
+            Id = Interlocked.Increment(ref s_nextId).ToString();
+            insp = new Inspector(Id);
             cli = insp.Client;
             scripts = SubscribeToScripts(insp);
 

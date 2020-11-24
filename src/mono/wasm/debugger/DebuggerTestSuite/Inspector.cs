@@ -29,12 +29,14 @@ namespace DebuggerTests
         public InspectorClient Client { get; }
 
         private CancellationTokenSource _cancellationTokenSource;
+        private readonly string _id;
 
         protected ILoggerFactory _loggerFactory;
         protected ILogger _logger;
 
-        public Inspector()
+        public Inspector(string id)
         {
+            _id = id;
             _cancellationTokenSource = new CancellationTokenSource();
             Token = _cancellationTokenSource.Token;
 
@@ -48,8 +50,8 @@ namespace DebuggerTests
                 });
             });
 
-            Client = new InspectorClient(_loggerFactory.CreateLogger<InspectorClient>());
-            _logger = _loggerFactory.CreateLogger<Inspector>();
+            Client = new InspectorClient(_id, _loggerFactory.CreateLogger($"{typeof(InspectorClient)}-{_id}"));
+            _logger = _loggerFactory.CreateLogger($"{typeof(Inspector)}-{_id}");
         }
 
         public Task<JObject> WaitFor(string what)
@@ -146,7 +148,7 @@ namespace DebuggerTests
             {
                 _cancellationTokenSource.CancelAfter(span?.Milliseconds ?? DefaultTestTimeoutMs);
 
-                var uri = new Uri($"ws://{TestHarnessProxy.Endpoint.Authority}/launch-chrome-and-connect");
+                var uri = new Uri($"ws://{TestHarnessProxy.Endpoint.Authority}/launch-chrome-and-connect?testId={_id}");
 
                 await Client.Connect(uri, OnMessage, _cancellationTokenSource.Token);
                 Client.RunLoopStopped += (_, args) =>

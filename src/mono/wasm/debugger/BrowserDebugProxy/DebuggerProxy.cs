@@ -17,9 +17,9 @@ namespace Microsoft.WebAssembly.Diagnostics
     {
         private readonly MonoProxy proxy;
 
-        public DebuggerProxy(ILoggerFactory loggerFactory, IList<string> urlSymbolServerList)
+        public DebuggerProxy(ILoggerFactory loggerFactory, IList<string> urlSymbolServerList, string id = "default")
         {
-            proxy = new MonoProxy(loggerFactory, urlSymbolServerList);
+            proxy = new MonoProxy(loggerFactory, urlSymbolServerList, id);
         }
 
         public Task Run(Uri browserUri, WebSocket ideSocket)

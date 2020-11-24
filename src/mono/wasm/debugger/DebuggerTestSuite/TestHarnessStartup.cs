@@ -20,6 +20,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
+using Microsoft.Extensions.Primitives;
 
 namespace Microsoft.WebAssembly.Diagnostics
 {
@@ -32,7 +33,7 @@ namespace Microsoft.WebAssembly.Diagnostics
         }
 
         public IConfiguration Configuration { get; set; }
-        public ILogger<TestHarnessProxy> Logger { get; private set; }
+        public ILogger<TestHarnessProxy> ServerLogger { get; private set; }
 
         private ILoggerFactory _loggerFactory;
 
@@ -46,7 +47,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         async Task SendNodeVersion(HttpContext context)
         {
-            Logger.LogTrace("hello chrome! json/version");
+            ServerLogger.LogTrace("hello chrome! json/version");
             var resp_obj = new JObject();
             resp_obj["Browser"] = "node.js/v9.11.1";
             resp_obj["Protocol-Version"] = "1.1";
@@ -57,7 +58,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         async Task SendNodeList(HttpContext context)
         {
-            Logger.LogTrace("webserver: hello chrome! json/list");
+            ServerLogger.LogTrace("webserver: hello chrome! json/list");
             try
             {
                 var response = new JArray(JObject.FromObject(new
@@ -71,13 +72,13 @@ namespace Microsoft.WebAssembly.Diagnostics
                     webSocketDebuggerUrl = "ws://localhost:9300/91d87807-8a81-4f49-878c-a5604103b0a4"
                 })).ToString();
 
-                Logger.LogTrace($"webserver: sending: {response}");
+                ServerLogger.LogTrace($"webserver: sending: {response}");
                 await context.Response.WriteAsync(response, new CancellationTokenSource().Token);
             }
-            catch (Exception e) { Logger.LogError(e, "webserver: SendNodeList failed"); }
+            catch (Exception e) { ServerLogger.LogError(e, "webserver: SendNodeList failed"); }
         }
 
-        public async Task LaunchAndServe(ProcessStartInfo psi, HttpContext context, Func<string, Task<string>> extract_conn_url)
+        public async Task LaunchAndServe(ProcessStartInfo psi, HttpContext context, string testId, ILogger testLogger, Func<string, Task<string>> extract_conn_url)
         {
 
             if (!context.WebSockets.IsWebSocketRequest)
@@ -94,7 +95,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                 proc.ErrorDataReceived += (sender, e) =>
                 {
                     var str = e.Data;
-                    Logger.LogTrace($"browser-stderr: {str}");
+                    testLogger.LogTrace($"browser-stderr: {str}");
 
                     if (tcs.Task.IsCompleted)
                         return;
@@ -108,7 +109,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
                 proc.OutputDataReceived += (sender, e) =>
                 {
-                    Logger.LogTrace($"browser-stdout: {e.Data}");
+                    testLogger.LogTrace($"browser-stdout: {e.Data}");
                 };
 
                 proc.BeginErrorReadLine();
@@ -116,24 +117,24 @@ namespace Microsoft.WebAssembly.Diagnostics
 
                 if (await Task.WhenAny(tcs.Task, Task.Delay(5000)) != tcs.Task)
                 {
-                    Logger.LogError("Didnt get the con string after 5s.");
+                    testLogger.LogError("Didnt get the con string after 5s.");
                     throw new Exception("node.js timedout");
                 }
                 var line = await tcs.Task;
                 var con_str = extract_conn_url != null ? await extract_conn_url(line) : line;
 
-                Logger.LogInformation($"launching proxy for {con_str}");
+                testLogger.LogInformation($"launching proxy for {con_str}");
 
-                var proxy = new DebuggerProxy(_loggerFactory, null);
+                var proxy = new DebuggerProxy(_loggerFactory, null, testId);
                 var browserUri = new Uri(con_str);
                 var ideSocket = await context.WebSockets.AcceptWebSocketAsync();
 
                 await proxy.Run(browserUri, ideSocket);
-                Logger.LogInformation("Proxy done");
+                testLogger.LogInformation("Proxy done");
             }
             catch (Exception e)
             {
-                Logger.LogError("got exception {0}", e);
+                testLogger.LogError("got exception {0}", e);
             }
             finally
             {
@@ -148,7 +149,7 @@ namespace Microsoft.WebAssembly.Diagnostics
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IOptionsMonitor<TestHarnessOptions> optionsAccessor, IWebHostEnvironment env, ILogger<TestHarnessProxy> logger, ILoggerFactory loggerFactory)
         {
-            this.Logger = logger;
+            this.ServerLogger = logger;
             this._loggerFactory = loggerFactory;
 
             app.UseWebSockets();
@@ -172,7 +173,13 @@ namespace Microsoft.WebAssembly.Diagnostics
             {
                 router.MapGet("launch-chrome-and-connect", async context =>
                 {
-                    Logger.LogInformation("New test request");
+                    string testId = "unknown";
+                    if (context.Request.Query.TryGetValue("testId", out StringValues values))
+                        testId = values.ToString();
+
+                    var testLogger = _loggerFactory.CreateLogger($"{typeof(TestHarnessProxy)}-{testId}");
+
+                    testLogger.LogInformation("New test request");
                     try
                     {
                         var client = new HttpClient();
@@ -184,7 +191,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                         psi.RedirectStandardError = true;
                         psi.RedirectStandardOutput = true;
 
-                        await LaunchAndServe(psi, context, async (str) =>
+                        await LaunchAndServe(psi, context, testId, testLogger, async (str) =>
                         {
                             var start = DateTime.Now;
                             JArray obj = null;
@@ -198,7 +205,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                                 await Task.Delay(100);
 
                                 var res = await client.GetStringAsync(new Uri(new Uri(str), "/json/list"));
-                                Logger.LogTrace("res is {0}", res);
+                                testLogger.LogTrace("res is {0}", res);
 
                                 if (!String.IsNullOrEmpty(res))
                                 {
@@ -211,29 +218,29 @@ namespace Microsoft.WebAssembly.Diagnostics
                                 var elapsed = DateTime.Now - start;
                                 if (elapsed.Milliseconds > 5000)
                                 {
-                                    Logger.LogError($"Unable to get DevTools /json/list response in {elapsed.Seconds} seconds, stopping");
+                                    testLogger.LogError($"Unable to get DevTools /json/list response in {elapsed.Seconds} seconds, stopping");
                                     return null;
                                 }
                             }
 
                             var wsURl = obj[0]?["webSocketDebuggerUrl"]?.Value<string>();
-                            Logger.LogTrace(">>> {0}", wsURl);
+                            testLogger.LogTrace(">>> {0}", wsURl);
 
                             return wsURl;
                         });
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"launch-chrome-and-connect failed with {ex.ToString()}");
+                        testLogger.LogError($"launch-chrome-and-connect failed with {ex.ToString()}");
                     }
                 });
             });
 
             if (options.NodeApp != null)
             {
-                Logger.LogTrace($"Doing the nodejs: {options.NodeApp}");
+                ServerLogger.LogTrace($"Doing the nodejs: {options.NodeApp}");
                 var nodeFullPath = Path.GetFullPath(options.NodeApp);
-                Logger.LogTrace(nodeFullPath);
+                ServerLogger.LogTrace(nodeFullPath);
                 var psi = new ProcessStartInfo();
 
                 psi.UseShellExecute = false;
@@ -251,7 +258,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                     router.MapGet("json/version", SendNodeVersion);
                     router.MapGet("launch-done-and-connect", async context =>
                     {
-                        await LaunchAndServe(psi, context, null);
+                        await LaunchAndServe(psi, context, null, null, null);
                     });
                 });
             }
