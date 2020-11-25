@@ -242,15 +242,22 @@ namespace DebuggerTests
             }
         }
 
-        public async Task ShutdownAsync()
+        public async Task DisposeAsync(bool shutdownConnection = true)
         {
-            if (Client == null)
-                throw new InvalidOperationException($"InspectorClient is null. Duplicate Shutdown?");
+            // if (Client == null)
+            //     throw new InvalidOperationException($"InspectorClient is null. Duplicate Shutdown?");
 
             try
             {
                 _logger?.LogDebug($"- test done,. let's close the client");
-                await Client.Shutdown(_cancellationTokenSource.Token).ConfigureAwait(false);
+                if (Session != null)
+                {
+                    // FIXME: ium and add a timer on this token?
+                    if (shutdownConnection)
+                        await Session!.ShutdownConnection(new CancellationToken());
+                    await Session!.DisposeAsync();
+                }
+                // await Client.Shutdown(_cancellationTokenSource.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -260,7 +267,7 @@ namespace DebuggerTests
             finally
             {
                 _cancellationTokenSource.Cancel();
-                Client.Dispose();
+                // Client.Dispose();
                 _loggerFactory?.Dispose();
                 _cancellationTokenSource.Dispose();
             }

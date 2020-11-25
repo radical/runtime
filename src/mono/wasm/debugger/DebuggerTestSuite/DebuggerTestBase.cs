@@ -21,7 +21,7 @@ namespace DebuggerTests
 {
     public class DebuggerTestBase : IAsyncLifetime
     {
-        internal InspectorClient cli;
+        // internal InspectorClient cli;
         internal Inspector insp;
 
         protected CancellationTokenSource _cancellationTokenSource = new ();
@@ -62,7 +62,7 @@ namespace DebuggerTests
         {
             Id = Interlocked.Increment(ref s_nextId).ToString();
             insp = new Inspector(Id, _cancellationTokenSource);
-            cli = insp.Client;
+            // cli = insp.Client;
             scripts = SubscribeToScripts(insp);
 
             token = _cancellationTokenSource.Token;
@@ -92,10 +92,14 @@ namespace DebuggerTests
 
             // await Ready();
             await insp.OpenSessionAsync("/debugger-driver.html", fn);
-            cli = insp.Client;
+            // cli = insp.Client;
         }
 
-        public virtual async Task DisposeAsync() => await insp.ShutdownAsync().ConfigureAwait(false);
+        public virtual async Task DisposeAsync()
+        {
+            Console.WriteLine ($"-- [{Id}] TestBase.DisposeAsync");
+            await insp.DisposeAsync(true);
+        }
 
         public Task Ready() => Task.CompletedTask;
 

@@ -28,11 +28,15 @@ namespace Microsoft.WebAssembly.Diagnostics
         // private ConcurrentDictionary<string, BrowserCdpConnection> targets = new ConcurrentDictionary<string, BrowserCdpConnection>();
         public bool HasExited => _process.HasExited;
 
+        public CancellationToken CancellationToken => _cancellationTokenSource.Token;
+        private CancellationTokenSource _cancellationTokenSource;
+
         private BrowserInstance(Uri remoteConnectionUri, Process process, ILogger logger)
         {
             _remoteConnectionUri = remoteConnectionUri;
             _process = process;
             _poolLogger = logger;
+            _cancellationTokenSource = new CancellationTokenSource();
 
             Id = Interlocked.Increment(ref s_nextId);
 
@@ -40,9 +44,9 @@ namespace Microsoft.WebAssembly.Diagnostics
             TestHarnessProxy.LauncherData.IdToDevToolsUrl[Id.ToString()] = remoteConnectionUri;
         }
 
-        public async Task<BrowserCdpConnection> OpenConnection(string testId, ILogger testLogger, CancellationTokenSource testCts)
+        private async Task<BrowserCdpConnection> OpenConnection(string testId, ILogger testLogger)
         {
-            return await BrowserCdpConnection.Open(Id, testId, testLogger, testCts);
+            return await BrowserCdpConnection.Open(Id, testId, testLogger, _cancellationTokenSource);
         }
 
         public static async Task<BrowserInstance> StartAsync(ILogger logger, CancellationToken token, int port=0)
@@ -75,7 +79,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
             if (connection == null)
             {
-                connection = await OpenConnection(testId, logger, cts);
+                connection = await OpenConnection(testId, logger);
                 connection.InspectorClient!.RunLoopStopped += (_, args) => onRunLoopFailedOrCanceled(args);
             }
 
