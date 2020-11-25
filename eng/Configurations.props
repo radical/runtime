@@ -73,6 +73,7 @@
   <PropertyGroup Label="CalculateOS">
     <_runtimeOS>$(RuntimeOS)</_runtimeOS>
 
+    <__DistroRid>osx-x64</__DistroRid>
     <_parseDistroRid>$(__DistroRid)</_parseDistroRid>
     <_parseDistroRid Condition="'$(_parseDistroRid)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)</_parseDistroRid>
     <_distroRidIndex>$(_parseDistroRid.LastIndexOfAny("-"))</_distroRidIndex>

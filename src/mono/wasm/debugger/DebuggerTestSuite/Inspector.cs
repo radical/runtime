@@ -18,27 +18,26 @@ namespace DebuggerTests
 {
     class Inspector
     {
-        private const int DefaultTestTimeoutMs = 1 * 60 * 1000;
-
         Dictionary<string, TaskCompletionSource<JObject>> notifications = new Dictionary<string, TaskCompletionSource<JObject>>();
         Dictionary<string, Func<JObject, CancellationToken, Task>> eventListeners = new Dictionary<string, Func<JObject, CancellationToken, Task>>();
 
         public const string PAUSE = "pause";
         public const string READY = "ready";
-        public CancellationToken Token { get; }
-        public InspectorClient Client { get; }
+        public CancellationToken Token => _cancellationTokenSource.Token;
+        public InspectorClient? Client { get; private set; }
 
-        private CancellationTokenSource _cancellationTokenSource;
+        public BrowserSession? Session { get; private set; }
+
+        private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly string _id;
 
         protected ILoggerFactory _loggerFactory;
         protected ILogger _logger;
 
-        public Inspector(string id)
+        public Inspector(string id, CancellationTokenSource cts)
         {
             _id = id;
-            _cancellationTokenSource = new CancellationTokenSource();
-            Token = _cancellationTokenSource.Token;
+            _cancellationTokenSource = cts;
 
             _loggerFactory = LoggerFactory.Create(builder =>
             {
@@ -47,10 +46,10 @@ namespace DebuggerTests
                     c.ColorBehavior = LoggerColorBehavior.Enabled;
                     c.TimestampFormat = "[HH:mm:ss.fff] ";
                     c.SingleLine = true;
-                });
+                }).AddFilter(null, LogLevel.Trace);
             });
 
-            Client = new InspectorClient(_id, _loggerFactory.CreateLogger($"{typeof(InspectorClient)}-{_id}"));
+            // Client = new InspectorClient(_id, _loggerFactory.CreateLogger($"{typeof(InspectorClient)}-{_id}"));
             _logger = _loggerFactory.CreateLogger($"{typeof(Inspector)}-{_id}");
         }
 
@@ -141,35 +140,28 @@ namespace DebuggerTests
             }
         }
 
-        public async Task OpenSessionAsync(Func<InspectorClient, CancellationToken, List<(string, Task<Result>)>> getInitCmds, TimeSpan? span = null)
+        public async Task OpenSessionAsync(string relativeUrl, Func<BrowserSession, CancellationToken, List<(string, Task<Result>)>> getInitCmds)
         {
             var start = DateTime.Now;
             try
             {
-                _cancellationTokenSource.CancelAfter(span?.Milliseconds ?? DefaultTestTimeoutMs);
+                // var uri = new Uri($"ws://{TestHarnessProxy.Endpoint.Authority}/launch-chrome-and-connect?testId={_id}");
 
-                var uri = new Uri($"ws://{TestHarnessProxy.Endpoint.Authority}/launch-chrome-and-connect?testId={_id}");
+                BrowserInstance browser = await BrowserPool.GetInstanceAsync(_logger, DebuggerTestBase.DebuggerTestAppPath, Token);
+                Session = await browser.OpenSession(
+                                            relativeUrl,
+                                            OnMessage,
+                                            RunLoopStoppedHandler,
+                                            _id,
+                                            _logger,
+                                            _cancellationTokenSource);
 
-                await Client.Connect(uri, OnMessage, _cancellationTokenSource.Token);
-                Client.RunLoopStopped += (_, args) =>
-                {
-                    switch (args.reason)
-                    {
-                        case RunLoopStopReason.Exception:
-                            FailAllWaiters(args.ex);
-                            break;
+                Client = Session.Connection.InspectorClient;
 
-                        case RunLoopStopReason.Cancelled when Token.IsCancellationRequested:
-                            FailAllWaiters(new TaskCanceledException($"Test timed out (elapsed time: {(DateTime.Now - start).TotalSeconds}"));
-                            break;
+                // await Client.Connect(uri, OnMessage, _cancellationTokenSource.Token);
+                // Client.RunLoopStopped += (_, args) =>
 
-                        default:
-                            FailAllWaiters();
-                            break;
-                    };
-                };
-
-                var init_cmds = getInitCmds(Client, _cancellationTokenSource.Token);
+                var init_cmds = getInitCmds(Session, _cancellationTokenSource.Token);
 
                 Task<Result> readyTask = Task.Run(async () => Result.FromJson(await WaitFor(READY)));
                 init_cmds.Add((READY, readyTask));
@@ -211,6 +203,24 @@ namespace DebuggerTests
                 _logger.LogDebug(ex.ToString());
                 throw;
             }
+
+            void RunLoopStoppedHandler((RunLoopStopReason reason, Exception? ex) args)
+            {
+                switch (args.reason)
+                {
+                    case RunLoopStopReason.Exception:
+                        FailAllWaiters(args.ex);
+                        break;
+
+                    case RunLoopStopReason.Cancelled when Token.IsCancellationRequested:
+                        FailAllWaiters(new TaskCanceledException($"Test timed out (elapsed time: {(DateTime.Now - start).TotalSeconds}"));
+                        break;
+
+                    default:
+                        FailAllWaiters();
+                        break;
+                };
+            };
 
             static string RemainingCommandsToString(string cmd_name, IList<(string, Task<Result>)> cmds)
             {

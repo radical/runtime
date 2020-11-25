@@ -335,7 +335,6 @@ namespace DebuggerTests
                     CheckObject(locals, "this", "Math.NestedInMath");
                 }
             );
-            Console.WriteLine(wait_res);
 
 #if false // Disabled for now, as we don't have proper async traces
             var locals = await GetProperties(wait_res["callFrames"][2]["callFrameId"].Value<string>());
@@ -856,7 +855,7 @@ namespace DebuggerTests
             await SetBreakpoint("dotnet://debugger-test.dll/debugger-test.cs", 554, 12);
 
             string expression = "window.setTimeout(function() { invoke_static_method ('[debugger-test] HiddenSequencePointTest:StepOverHiddenSP'); }, 1);";
-            await cli.SendCommand($"Runtime.evaluate", JObject.FromObject(new { expression }), token);
+            await SendCommand($"Runtime.evaluate", JObject.FromObject(new { expression }), token);
 
             Task pause_task = insp.WaitFor(Inspector.PAUSE);
             Task t = await Task.WhenAny(pause_task, Task.Delay(2000));

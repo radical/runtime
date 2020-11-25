@@ -146,7 +146,6 @@ namespace DebuggerTests
             }
             catch (ArgumentException ae)
             {
-                Console.WriteLine($"{ae}");
                 var eo = JObject.Parse(ae.Message);
 
                 AssertEqual(line, eo["exceptionDetails"]?["lineNumber"]?.Value<int>(), "lineNumber");

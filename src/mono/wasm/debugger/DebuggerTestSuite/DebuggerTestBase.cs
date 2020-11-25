@@ -23,15 +23,19 @@ namespace DebuggerTests
     {
         internal InspectorClient cli;
         internal Inspector insp;
+
+        protected CancellationTokenSource _cancellationTokenSource = new ();
         protected CancellationToken token;
         protected Dictionary<string, string> scripts;
         protected Task startTask;
 
         public bool UseCallFunctionOnBeforeGetProperties;
 
+        private const int DefaultTestTimeoutMs = 1 * 60 * 1000;
+
         static string s_debuggerTestAppPath;
         static int s_nextId;
-        protected static string DebuggerTestAppPath
+        public static string DebuggerTestAppPath
         {
             get
             {
@@ -52,49 +56,25 @@ namespace DebuggerTests
             throw new Exception($"Could not figure out debugger-test app path ({test_app_path}) based on the test suite location ({asm_dir})");
         }
 
-        static string[] PROBE_LIST = {
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-            "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-            "/usr/bin/chromium",
-            "/usr/bin/chromium-browser",
-        };
-        static string chrome_path;
-
-        static string FindChromePath()
-        {
-            if (chrome_path != null)
-                return chrome_path;
-
-            foreach (var s in PROBE_LIST)
-            {
-                if (File.Exists(s))
-                {
-                    chrome_path = s;
-                    Console.WriteLine($"Using chrome path: ${s}");
-                    return s;
-                }
-            }
-            throw new Exception("Could not find an installed Chrome to use");
-        }
-
         public string Id { get; init; }
 
-        public DebuggerTestBase(string driver = "debugger-driver.html")
+        public DebuggerTestBase()//string driver = "debugger-driver.html")
         {
             Id = Interlocked.Increment(ref s_nextId).ToString();
-            insp = new Inspector(Id);
+            insp = new Inspector(Id, _cancellationTokenSource);
             cli = insp.Client;
             scripts = SubscribeToScripts(insp);
 
-            startTask = TestHarnessProxy.Start(FindChromePath(), DebuggerTestAppPath, driver);
+            token = _cancellationTokenSource.Token;
+
+            // startTask = TestHarnessProxy.Start(DebuggerTestAppPath,
         }
 
         public virtual async Task InitializeAsync()
         {
-           Func<InspectorClient, CancellationToken, List<(string, Task<Result>)>> fn = (client, token) =>
+           Func<BrowserSession, CancellationToken, List<(string, Task<Result>)>> fn = (session, token) =>
             {
-                Func<string, (string, Task<Result>)> getInitCmdFn = (cmd) => (cmd, client.SendCommand(cmd, null, token));
+                Func<string, (string, Task<Result>)> getInitCmdFn = (cmd) => (cmd, session.SendCommand(cmd, null, token));
                 var init_cmds = new List<(string, Task<Result>)>
                 {
                     getInitCmdFn("Profiler.enable"),
@@ -106,13 +86,18 @@ namespace DebuggerTests
                 return init_cmds;
             };
 
-            await Ready();
-            await insp.OpenSessionAsync(fn);
+            TimeSpan? span = null; //TODO
+
+            _cancellationTokenSource.CancelAfter(span?.Milliseconds ?? DefaultTestTimeoutMs);
+
+            // await Ready();
+            await insp.OpenSessionAsync("/debugger-driver.html", fn);
+            cli = insp.Client;
         }
 
         public virtual async Task DisposeAsync() => await insp.ShutdownAsync().ConfigureAwait(false);
 
-        public Task Ready() => startTask;
+        public Task Ready() => Task.CompletedTask;
 
         internal Dictionary<string, string> dicScriptsIdToUrl;
         internal Dictionary<string, string> dicFileToUrl;
@@ -182,7 +167,7 @@ namespace DebuggerTests
             var bp = await SetBreakpointInMethod(assembly, type, method, line_offset, col);
 
             var args = JObject.FromObject(new { expression = eval_expression });
-            var res = await cli.SendCommand("Runtime.evaluate", args, token);
+            var res = await SendCommand("Runtime.evaluate", args, token);
             if (!res.IsOk)
             {
                 Console.WriteLine($"Failed to run command {method} with args: {args?.ToString()}\nresult: {res.Error.ToString()}");
@@ -343,9 +328,9 @@ namespace DebuggerTests
             return l;
         }
 
-        internal async Task<Result> SendCommand(string method, JObject args)
+        internal async Task<Result> SendCommand(string method, JObject args, CancellationToken? token = null)
         {
-            var res = await cli.SendCommand(method, args, token);
+            var res = await insp.Session?.SendCommand(method, args, token ?? _cancellationTokenSource.Token);
             if (!res.IsOk)
             {
                 Console.WriteLine($"Failed to run command {method} with args: {args?.ToString()}\nresult: {res.Error.ToString()}");
@@ -356,7 +341,7 @@ namespace DebuggerTests
 
         internal async Task<Result> Evaluate(string expression)
         {
-            return await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = expression }));
+            return await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = expression }), _cancellationTokenSource.Token);
         }
 
         internal void AssertLocation(JObject args, string methodName)
@@ -387,7 +372,7 @@ namespace DebuggerTests
             if (returnByValue != null)
                 req["returnByValue"] = returnByValue.Value;
 
-            var res = await cli.SendCommand("Runtime.callFunctionOn", req, token);
+            var res = await SendCommand("Runtime.callFunctionOn", req, token);
             Assert.True(expect_ok == res.IsOk, $"InvokeGetter failed for {req} with {res}");
 
             return res;
@@ -419,7 +404,7 @@ namespace DebuggerTests
         internal async Task<JObject> SendCommandAndCheck(JObject args, string method, string script_loc, int line, int column, string function_name,
             Func<JObject, Task> wait_for_event_fn = null, Action<JToken> locals_fn = null, string waitForEvent = Inspector.PAUSE)
         {
-            var res = await cli.SendCommand(method, args, token);
+            var res = await SendCommand(method, args, token);
             if (!res.IsOk)
             {
                 Console.WriteLine($"Failed to run command {method} with args: {args?.ToString()}\nresult: {res.Error.ToString()}");
@@ -735,7 +720,7 @@ namespace DebuggerTests
                 if (fn_args != null)
                     cfo_args["arguments"] = fn_args;
 
-                var result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+                var result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
                 AssertEqual(expect_ok, result.IsOk, $"Runtime.getProperties returned {result.IsOk} instead of {expect_ok}, for {cfo_args.ToString()}, with Result: {result}");
                 if (!result.IsOk)
                     return null;
@@ -755,7 +740,7 @@ namespace DebuggerTests
                 get_prop_req["accessorPropertiesOnly"] = accessors_only.Value;
             }
 
-            var frame_props = await cli.SendCommand("Runtime.getProperties", get_prop_req, token);
+            var frame_props = await SendCommand("Runtime.getProperties", get_prop_req, token);
             AssertEqual(expect_ok, frame_props.IsOk, $"Runtime.getProperties returned {frame_props.IsOk} instead of {expect_ok}, for {get_prop_req}, with Result: {frame_props}");
             if (!frame_props.IsOk)
                 return null;
@@ -786,7 +771,7 @@ namespace DebuggerTests
                 expression = expression
             });
 
-            var res = await cli.SendCommand("Debugger.evaluateOnCallFrame", evaluate_req, token);
+            var res = await SendCommand("Debugger.evaluateOnCallFrame", evaluate_req, token);
             AssertEqual(expect_ok, res.IsOk, $"Debugger.evaluateOnCallFrame ('{expression}', scope: {id}) returned {res.IsOk} instead of {expect_ok}, with Result: {res}");
             if (res.IsOk)
                 return (res.Value["result"], res);
@@ -801,7 +786,7 @@ namespace DebuggerTests
                 breakpointId = id
             });
 
-            var res = await cli.SendCommand("Debugger.removeBreakpoint", remove_bp, token);
+            var res = await SendCommand("Debugger.removeBreakpoint", remove_bp, token);
             Assert.True(expect_ok ? res.IsOk : res.IsErr);
 
             return res;
@@ -813,7 +798,7 @@ namespace DebuggerTests
                 JObject.FromObject(new { lineNumber = line, columnNumber = column, url = dicFileToUrl[url_key], }) :
                 JObject.FromObject(new { lineNumber = line, columnNumber = column, urlRegex = url_key, });
 
-            var bp1_res = await cli.SendCommand("Debugger.setBreakpointByUrl", bp1_req, token);
+            var bp1_res = await SendCommand("Debugger.setBreakpointByUrl", bp1_req, token);
             Assert.True(expect_ok ? bp1_res.IsOk : bp1_res.IsErr);
 
             return bp1_res;
@@ -821,7 +806,7 @@ namespace DebuggerTests
 
         internal async Task<Result> SetPauseOnException(string state)
         {
-            var exc_res = await cli.SendCommand("Debugger.setPauseOnExceptions", JObject.FromObject(new { state = state }), token);
+            var exc_res = await SendCommand("Debugger.setPauseOnExceptions", JObject.FromObject(new { state = state }), token);
             return exc_res;
         }
 
@@ -830,7 +815,7 @@ namespace DebuggerTests
             var req = JObject.FromObject(new { assemblyName = assembly, typeName = type, methodName = method, lineOffset = lineOffset });
 
             // Protocol extension
-            var res = await cli.SendCommand("DotnetDebugger.getMethodLocation", req, token);
+            var res = await SendCommand("DotnetDebugger.getMethodLocation", req, token);
             Assert.True(res.IsOk);
 
             var m_url = res.Value["result"]["url"].Value<string>();
@@ -843,7 +828,7 @@ namespace DebuggerTests
                 url = m_url
             });
 
-            res = await cli.SendCommand("Debugger.setBreakpointByUrl", bp1_req, token);
+            res = await SendCommand("Debugger.setBreakpointByUrl", bp1_req, token);
             Assert.True(res.IsOk);
 
             return res;

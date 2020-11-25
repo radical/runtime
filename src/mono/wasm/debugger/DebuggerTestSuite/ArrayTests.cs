@@ -278,7 +278,7 @@ namespace DebuggerTests
                     cfo_args["arguments"] = fn_args;
 
                 // callFunctionOn
-                var result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+                var result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
 
                 return await GetProperties(result.Value["result"]["objectId"]?.Value<string>(), fn_args);
             }

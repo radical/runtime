@@ -2,10 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -18,15 +15,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
 using Microsoft.Extensions.Primitives;
+using Newtonsoft.Json.Linq;
 
 namespace Microsoft.WebAssembly.Diagnostics
 {
     public class TestHarnessStartup
     {
-        static Regex parseConnection = new Regex(@"listening on (ws?s://[^\s]*)");
         public TestHarnessStartup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -34,7 +29,6 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         public IConfiguration Configuration { get; set; }
         public ILogger<TestHarnessProxy> ServerLogger { get; private set; }
-
         private ILoggerFactory _loggerFactory;
 
         // This method gets called by the runtime. Use this method to add services to the container.
@@ -78,190 +72,102 @@ namespace Microsoft.WebAssembly.Diagnostics
             catch (Exception e) { ServerLogger.LogError(e, "webserver: SendNodeList failed"); }
         }
 
-        public async Task LaunchAndServe(ProcessStartInfo psi, HttpContext context, string testId, ILogger testLogger, Func<string, Task<string>> extract_conn_url)
-        {
-
-            if (!context.WebSockets.IsWebSocketRequest)
-            {
-                context.Response.StatusCode = 400;
-                return;
-            }
-
-            var tcs = new TaskCompletionSource<string>();
-
-            var proc = Process.Start(psi);
-            try
-            {
-                proc.ErrorDataReceived += (sender, e) =>
-                {
-                    var str = e.Data;
-                    testLogger.LogTrace($"browser-stderr: {str}");
-
-                    if (tcs.Task.IsCompleted)
-                        return;
-
-                    var match = parseConnection.Match(str);
-                    if (match.Success)
-                    {
-                        tcs.TrySetResult(match.Groups[1].Captures[0].Value);
-                    }
-                };
-
-                proc.OutputDataReceived += (sender, e) =>
-                {
-                    testLogger.LogTrace($"browser-stdout: {e.Data}");
-                };
-
-                proc.BeginErrorReadLine();
-                proc.BeginOutputReadLine();
-
-                if (await Task.WhenAny(tcs.Task, Task.Delay(5000)) != tcs.Task)
-                {
-                    testLogger.LogError("Didnt get the con string after 5s.");
-                    throw new Exception("node.js timedout");
-                }
-                var line = await tcs.Task;
-                var con_str = extract_conn_url != null ? await extract_conn_url(line) : line;
-
-                testLogger.LogInformation($"launching proxy for {con_str}");
-
-                var proxy = new DebuggerProxy(_loggerFactory, null, testId);
-                var browserUri = new Uri(con_str);
-                var ideSocket = await context.WebSockets.AcceptWebSocketAsync();
-
-                await proxy.Run(browserUri, ideSocket);
-                testLogger.LogInformation("Proxy done");
-            }
-            catch (Exception e)
-            {
-                testLogger.LogError("got exception {0}", e);
-            }
-            finally
-            {
-                proc.CancelErrorRead();
-                proc.CancelOutputRead();
-                proc.Kill();
-                proc.WaitForExit();
-                proc.Close();
-            }
-        }
-
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IOptionsMonitor<TestHarnessOptions> optionsAccessor, IWebHostEnvironment env, ILogger<TestHarnessProxy> logger, ILoggerFactory loggerFactory)
         {
             this.ServerLogger = logger;
             this._loggerFactory = loggerFactory;
 
+            // _launcherData = app.ApplicationServices.GetRequiredService<ProxyLauncherData>();
+
             app.UseWebSockets();
-            app.UseStaticFiles();
+            // app.UseStaticFiles();
 
             TestHarnessOptions options = optionsAccessor.CurrentValue;
 
             var provider = new FileExtensionContentTypeProvider();
             provider.Mappings[".wasm"] = "application/wasm";
 
+            foreach (var extn in new string[] { ".dll", ".pdb", ".dat", ".blat" })
+            {
+                provider.Mappings[extn] = "application/octet-stream";
+            }
+
+            ServerLogger.LogInformation($"Starting webserver with appPath: {options.AppPath}");
+
             app.UseStaticFiles(new StaticFileOptions
             {
                 FileProvider = new PhysicalFileProvider(options.AppPath),
                 ServeUnknownFileTypes = true, //Cuz .wasm is not a known file type :cry:
-                RequestPath = "",
+                // RequestPath = "",
                 ContentTypeProvider = provider
             });
 
             var devToolsUrl = options.DevToolsUrl;
             app.UseRouter(router =>
             {
-                router.MapGet("launch-chrome-and-connect", async context =>
+                router.MapGet("/connect-to-devtools/{browserInstanceId:int:required}", async context =>
                 {
-                    string testId = "unknown";
-                    if (context.Request.Query.TryGetValue("testId", out StringValues values))
-                        testId = values.ToString();
-
-                    var testLogger = _loggerFactory.CreateLogger($"{typeof(TestHarnessProxy)}-{testId}");
-
-                    testLogger.LogInformation("New test request");
                     try
                     {
-                        var client = new HttpClient();
-                        var psi = new ProcessStartInfo();
+                        var id = context.Request.RouteValues["browserInstanceId"].ToString();
+                        string testId = "unknown";
+                        if (context.Request.Query.TryGetValue("testId", out StringValues values))
+                            testId = values.ToString();
 
-                        psi.Arguments = $"--headless --disable-gpu --lang=en-US --incognito --remote-debugging-port={devToolsUrl.Port} http://{TestHarnessProxy.Endpoint.Authority}/{options.PagePath}";
-                        psi.UseShellExecute = false;
-                        psi.FileName = options.ChromePath;
-                        psi.RedirectStandardError = true;
-                        psi.RedirectStandardOutput = true;
+                        var testLogger = _loggerFactory.CreateLogger($"{typeof(TestHarnessProxy)}-{testId}");
 
-                        await LaunchAndServe(psi, context, testId, testLogger, async (str) =>
-                        {
-                            var start = DateTime.Now;
-                            JArray obj = null;
+                        testLogger.LogDebug($"New test request for browserId: {id}, test_id: {testId}, with kestrel connection id: {context.Connection.Id}");
+                        if (!TestHarnessProxy.LauncherData.IdToDevToolsUrl.TryGetValue(id, out Uri remoteConnectionUri))
+                            throw new Exception($"Unknown browser id {id}");
 
-                            while (true)
-                            {
-                                // Unfortunately it does look like we have to wait
-                                // for a bit after getting the response but before
-                                // making the list request.  We get an empty result
-                                // if we make the request too soon.
-                                await Task.Delay(100);
+                        // string logFilename = $"{testId}-proxy.log";
+                        // var proxyLoggerFactory = LoggerFactory.Create(
+                        //     builder => builder
+                        //         // .AddFile(logFilename, minimumLevel: LogLevel.Debug)
+                        //         .AddFilter(null, LogLevel.Trace));
 
-                                var res = await client.GetStringAsync(new Uri(new Uri(str), "/json/list"));
-                                testLogger.LogTrace("res is {0}", res);
+                        var proxy = new DebuggerProxy(_loggerFactory, null, testId);
+                        var browserUri = remoteConnectionUri;// options.RemoteConnectionUri;
+                        var ideSocket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
 
-                                if (!String.IsNullOrEmpty(res))
-                                {
-                                    // Sometimes we seem to get an empty array `[ ]`
-                                    obj = JArray.Parse(res);
-                                    if (obj != null && obj.Count >= 1)
-                                        break;
-                                }
-
-                                var elapsed = DateTime.Now - start;
-                                if (elapsed.Milliseconds > 5000)
-                                {
-                                    testLogger.LogError($"Unable to get DevTools /json/list response in {elapsed.Seconds} seconds, stopping");
-                                    return null;
-                                }
-                            }
-
-                            var wsURl = obj[0]?["webSocketDebuggerUrl"]?.Value<string>();
-                            testLogger.LogTrace(">>> {0}", wsURl);
-
-                            return wsURl;
-                        });
+                        await proxy.Run(browserUri, ideSocket).ConfigureAwait(false);
+                        // Console.WriteLine("Proxy done");
+                        testLogger.LogDebug($"Closing proxy for browser {context.Request.Path}{context.Request.QueryString}");
                     }
                     catch (Exception ex)
                     {
-                        testLogger.LogError($"launch-chrome-and-connect failed with {ex.ToString()}");
+                        ServerLogger.LogError($"{context.Request.Path}{context.Request.QueryString} failed with {ex}");
                     }
                 });
             });
 
-            if (options.NodeApp != null)
-            {
-                ServerLogger.LogTrace($"Doing the nodejs: {options.NodeApp}");
-                var nodeFullPath = Path.GetFullPath(options.NodeApp);
-                ServerLogger.LogTrace(nodeFullPath);
-                var psi = new ProcessStartInfo();
+            // if (options.NodeApp != null)
+            // {
+            //     Logger.LogTrace($"Doing the nodejs: {options.NodeApp}");
+            //     var nodeFullPath = Path.GetFullPath(options.NodeApp);
+            //     Logger.LogTrace(nodeFullPath);
+            //     var psi = new ProcessStartInfo();
 
-                psi.UseShellExecute = false;
-                psi.RedirectStandardError = true;
-                psi.RedirectStandardOutput = true;
+            //     psi.UseShellExecute = false;
+            //     psi.RedirectStandardError = true;
+            //     psi.RedirectStandardOutput = true;
 
-                psi.Arguments = $"--inspect-brk=localhost:0 {nodeFullPath}";
-                psi.FileName = "node";
+            //     psi.Arguments = $"--inspect-brk=localhost:0 {nodeFullPath}";
+            //     psi.FileName = "node";
 
-                app.UseRouter(router =>
-                {
-                    //Inspector API for using chrome devtools directly
-                    router.MapGet("json", SendNodeList);
-                    router.MapGet("json/list", SendNodeList);
-                    router.MapGet("json/version", SendNodeVersion);
-                    router.MapGet("launch-done-and-connect", async context =>
-                    {
-                        await LaunchAndServe(psi, context, null, null, null);
-                    });
-                });
-            }
+            //     app.UseRouter(router =>
+            //     {
+            //         //Inspector API for using chrome devtools directly
+            //         router.MapGet("json", SendNodeList);
+            //         router.MapGet("json/list", SendNodeList);
+            //         router.MapGet("json/version", SendNodeVersion);
+            //         router.MapGet("launch-done-and-connect", async context =>
+            //         {
+            //             await LaunchAndServe(psi, context, null);
+            //         });
+            //     });
+            // }
         }
     }
 }

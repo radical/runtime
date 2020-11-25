@@ -195,6 +195,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         protected override async Task<bool> AcceptCommand(MessageId id, string method, JObject args, CancellationToken token)
         {
+            logger.LogDebug($"AcceptCommand {method}");
             // Inspector doesn't use the Target domain or sessions
             // so we try to init immediately
             if (id == SessionId.Null)
@@ -390,7 +391,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                     }
                 case "DotnetDebugger.getMethodLocation":
                     {
-                        Console.WriteLine("set-breakpoint-by-method: " + id + " " + args);
+                        logger.LogDebug($"set-breakpoint-by-method: {id} {args}");
 
                         DebugStore store = await RuntimeReady(id, token);
                         string aname = args["assemblyName"]?.Value<string>();

@@ -45,7 +45,7 @@ namespace DebuggerTests
             Result res = await SetBreakpoint("dotnet://debugger-test.dll/debugger-test.cs", 10, 8);
             Assert.True(res.IsOk, $"setBreakpoint failed with {res}");
 
-            res = await cli.SendCommand(
+            res = await SendCommand(
                 "Runtime.evaluate",
                 JObject.FromObject(new { expression = "window.setTimeout(function() { invoke_add(); }, 0);" }),
                 token);

@@ -30,7 +30,7 @@ namespace DebuggerTests
                {
 
                    var is_js = bp_loc.EndsWith(".js", StringComparison.Ordinal);
-                   var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = true,
@@ -43,7 +43,7 @@ namespace DebuggerTests
 
                    // Check for a __proto__ object
                    // isOwn = true, accessorPropertiesOnly = false
-                   var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = false,
@@ -90,7 +90,7 @@ namespace DebuggerTests
                    var is_js = bp_loc.EndsWith(".js", StringComparison.Ordinal);
 
                    // isOwn = false, accessorPropertiesOnly = true
-                   var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = true,
@@ -104,7 +104,7 @@ namespace DebuggerTests
                    // Ignoring the __proto__ property
 
                    // isOwn = true, accessorPropertiesOnly = false
-                   var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = false,
@@ -142,7 +142,7 @@ namespace DebuggerTests
                    var is_js = bp_loc.EndsWith(".js", StringComparison.Ordinal);
 
                    // getProperties (isOwn = false, accessorPropertiesOnly = true)
-                   var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = true,
@@ -154,7 +154,7 @@ namespace DebuggerTests
                        AssertEqual(0, obj_accessors.Value["result"]?.Count(), "obj_accessors-count");
 
                    // getProperties (isOwn = true, accessorPropertiesOnly = false)
-                   var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = false,
@@ -188,7 +188,7 @@ namespace DebuggerTests
                    var is_js = bp_loc.EndsWith(".js");
 
                    // getProperties (own=false)
-                   var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = true,
@@ -202,7 +202,7 @@ namespace DebuggerTests
 
                    // getProperties (own=true)
                    // isOwn = true, accessorPropertiesOnly = false
-                   var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+                   var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                    {
                        objectId = result.Value["result"]["objectId"].Value<string>(),
                        accessorPropertiesOnly = false,
@@ -239,7 +239,7 @@ namespace DebuggerTests
                var ret_len = 5;
 
                // getProperties (own=false)
-               var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+               var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                {
                    objectId = result.Value["result"]["objectId"].Value<string>(),
                    accessorPropertiesOnly = true,
@@ -250,7 +250,7 @@ namespace DebuggerTests
 
                // getProperties (own=true)
                // isOwn = true, accessorPropertiesOnly = false
-               var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+               var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                {
                    objectId = result.Value["result"]["objectId"].Value<string>(),
                    accessorPropertiesOnly = false,
@@ -299,7 +299,7 @@ namespace DebuggerTests
            {
 
                // getProperties (own=false)
-               var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+               var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                {
                    objectId = result.Value["result"]["objectId"].Value<string>(),
                    accessorPropertiesOnly = true,
@@ -309,7 +309,7 @@ namespace DebuggerTests
 
                // getProperties (own=true)
                // isOwn = true, accessorPropertiesOnly = false
-               var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+               var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                {
                    objectId = result.Value["result"]["objectId"].Value<string>(),
                    accessorPropertiesOnly = false,
@@ -345,7 +345,7 @@ namespace DebuggerTests
            {
 
                // getProperties (own=false)
-               var obj_accessors = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+               var obj_accessors = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                {
                    objectId = result.Value["result"]["objectId"].Value<string>(),
                    accessorPropertiesOnly = true,
@@ -356,7 +356,7 @@ namespace DebuggerTests
 
                // getProperties (own=true)
                // isOwn = true, accessorPropertiesOnly = false
-               var obj_own = await cli.SendCommand("Runtime.getProperties", JObject.FromObject(new
+               var obj_own = await SendCommand("Runtime.getProperties", JObject.FromObject(new
                {
                    objectId = result.Value["result"]["objectId"].Value<string>(),
                    accessorPropertiesOnly = false,
@@ -446,7 +446,7 @@ namespace DebuggerTests
 
             // callFunctionOn
             var eval_expr = $"window.setTimeout(function() {{ {eval_fn} }}, 1);";
-            var result = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
+            var result = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
             var pause_location = await insp.WaitFor(Inspector.PAUSE);
 
             // Um for js we get "scriptId": "6"
@@ -469,7 +469,7 @@ namespace DebuggerTests
                 cfo_args["returnByValue"] = return_by_val;
 
             // callFunctionOn
-            result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+            result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
             await CheckValue(result.Value["result"], TNumber(5), "cfo-res");
 
             cfo_args = JObject.FromObject(new
@@ -484,7 +484,7 @@ namespace DebuggerTests
                 cfo_args["returnByValue"] = return_by_val;
 
             // callFunctionOn
-            result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+            result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
             await CheckValue(result.Value["result"], JObject.FromObject(new { type = "string", value = "test value" }), "cfo-res");
 
             cfo_args = JObject.FromObject(new
@@ -499,7 +499,7 @@ namespace DebuggerTests
                 cfo_args["returnByValue"] = return_by_val;
 
             // callFunctionOn
-            result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+            result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
             await CheckValue(result.Value["result"], JObject.Parse("{ type: 'object', subtype: 'null', value: null }"), "cfo-res");
         }
 
@@ -518,7 +518,7 @@ namespace DebuggerTests
 
             // callFunctionOn
             var eval_expr = "window.setTimeout(function() { " + eval_fn + " }, 1);";
-            var result = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
+            var result = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
             var pause_location = await insp.WaitFor(Inspector.PAUSE);
 
             var frame_locals = await GetProperties(pause_location["callFrames"][0]["scopeChain"][0]["object"]["objectId"].Value<string>());
@@ -538,7 +538,7 @@ namespace DebuggerTests
 
             // callFunctionOn, Silent does not change the result, except that the error
             // doesn't get reported, and the execution is NOT paused even with setPauseOnException=true
-            result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+            result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
             Assert.False(result.IsOk, "result.IsOk");
             Assert.True(result.IsErr, "result.IsErr");
 
@@ -753,7 +753,7 @@ namespace DebuggerTests
 
             async Task<Result> GetPropertiesAndCheckAccessors(JObject get_prop_req, int num_fields)
             {
-                var res = await cli.SendCommand("Runtime.getProperties", get_prop_req, token);
+                var res = await SendCommand("Runtime.getProperties", get_prop_req, token);
                 if (!res.IsOk)
                     Assert.True(false, $"Runtime.getProperties failed for {get_prop_req.ToString()}, with Result: {res}");
 
@@ -790,7 +790,7 @@ namespace DebuggerTests
                    objectId = ptd_id + "_invalid"
                });
 
-               var res = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+               var res = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
                Assert.True(res.IsErr);
            });
 
@@ -803,7 +803,7 @@ namespace DebuggerTests
 
             // callFunctionOn
             var eval_expr = $"window.setTimeout(function() {{ {eval_fn} }}, 1);";
-            var result = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
+            var result = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
             var pause_location = await insp.WaitFor(Inspector.PAUSE);
 
             var frame_locals = await GetProperties(pause_location["callFrames"][0]["scopeChain"][0]["object"]["objectId"].Value<string>());
@@ -816,7 +816,7 @@ namespace DebuggerTests
                 objectId = ptd_id + "_invalid"
             });
 
-            var res = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+            var res = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
             Assert.True(res.IsErr);
         }
 
@@ -890,7 +890,7 @@ namespace DebuggerTests
 
             // callFunctionOn
             var eval_expr = $"window.setTimeout(function() {{ {eval_fn} }}, 1);";
-            var result = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
+            var result = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
             var pause_location = await insp.WaitFor(Inspector.PAUSE);
 
             // Um for js we get "scriptId": "6"
@@ -914,7 +914,7 @@ namespace DebuggerTests
                 cfo_args["returnByValue"] = returnByValue;
 
             // callFunctionOn
-            result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+            result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
             await CheckCFOResult(result);
 
             // If it wasn't `returnByValue`, then try to run a new function
@@ -932,7 +932,7 @@ namespace DebuggerTests
                 if (fn_args != null)
                     cfo_args["arguments"] = fn_args;
 
-                result = await cli.SendCommand("Runtime.callFunctionOn", cfo_args, token);
+                result = await SendCommand("Runtime.callFunctionOn", cfo_args, token);
 
                 await CheckCFOResult(result);
             }

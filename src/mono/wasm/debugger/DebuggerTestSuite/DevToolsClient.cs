@@ -16,12 +16,14 @@ namespace Microsoft.WebAssembly.Diagnostics
     {
         DevToolsQueue _queue;
         ClientWebSocket socket;
-        TaskCompletionSource _clientInitiatedClose = new TaskCompletionSource();
-        TaskCompletionSource _shutdownRequested = new TaskCompletionSource();
+        TaskCompletionSource _clientInitiatedClose = new ();
+        TaskCompletionSource _shutdownRequested = new ();
         TaskCompletionSource _newSendTaskAvailable = new ();
         protected readonly ILogger logger;
         protected readonly string _id;
 
+        // private bool IsCloseRequested => _clientInitiatedClose.Task.IsCompletedSuccessfully;
+        public bool IsRunning { get; private set; }
         public event EventHandler<(RunLoopStopReason reason, Exception ex)> RunLoopStopped;
 
         public DevToolsClient(string id, ILogger logger)
@@ -46,6 +48,8 @@ namespace Microsoft.WebAssembly.Diagnostics
                 socket.Dispose();
         }
 
+        //FIXME: DisposeAsync
+
         public async Task Shutdown(CancellationToken cancellationToken)
         {
             if (_shutdownRequested.Task.IsCompleted)
@@ -66,6 +70,25 @@ namespace Microsoft.WebAssembly.Diagnostics
                 logger.LogDebug($"DevToolsClient.Shutdown: Close failed, but ignoring: {ex}");
             }
         }
+
+        private void LogState()
+        {
+            var sb = new StringBuilder();
+            sb.Append($"------------ DevtoolsClient.RunLoop [{_id}] state dump -----------\n");
+            LogState(sb);
+
+            // sb.Append($"Running time: {DateTime.Now - _startTime}");
+
+            // ThreadPool.GetAvailableThreads(out int workerThreads, out int completionPortThreads);
+            // sb.Append($"TP available threads: worker: {workerThreads}, compleition: {completionPortThreads}\n");
+            // sb.Append($"TP PendingWorkItemCount: {ThreadPool.PendingWorkItemCount}\n");
+
+            sb.Append($"------------ DevtoolsClient.RunLoop -----------\n");
+            logger.LogDebug(sb.ToString());
+        }
+
+        protected virtual void LogState(StringBuilder sb) =>
+            sb.Append($"pending_ops: , IsRunning: {IsRunning}\n");
 
         async Task<string> ReadOne(CancellationToken token)
         {
@@ -129,6 +152,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
             var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
 
+            IsRunning = true;
             _ = Task.Run(async () =>
             {
                 try
@@ -159,6 +183,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                 }
                 finally
                 {
+                    IsRunning = false;
                     logger.LogDebug($"Loop ended with socket: {socket.State}");
                     linkedCts.Cancel();
                 }

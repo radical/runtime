@@ -294,7 +294,7 @@ namespace DebuggerTests
                 eval_expr = "window.setTimeout(function() { invoke_static_method ('[debugger-test] DebuggerTests.GetPropertiesTests.DerivedClassForJSTest:run'); }, 1)";
             }
 
-            var result = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
+            var result = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = eval_expr }), token);
             var pause_location = await insp.WaitFor(Inspector.PAUSE);
 
             var id = pause_location["callFrames"][0]["scopeChain"][0]["object"]["objectId"].Value<string>();

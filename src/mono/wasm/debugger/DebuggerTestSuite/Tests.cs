@@ -130,7 +130,7 @@ namespace DebuggerTests
                 url = "dotnet://debugger-test.dll/this-file-doesnt-exist.cs",
             });
 
-            var bp1_res = await cli.SendCommand("Debugger.setBreakpointByUrl", bp1_req, token);
+            var bp1_res = await SendCommand("Debugger.setBreakpointByUrl", bp1_req, token);
 
             Assert.True(bp1_res.IsOk);
             Assert.Empty(bp1_res.Value["locations"].Values<object>());
@@ -183,7 +183,7 @@ namespace DebuggerTests
                 expression = "invoke_bad_js_test();"
             });
 
-            var eval_res = await cli.SendCommand("Runtime.evaluate", eval_req, token);
+            var eval_res = await SendCommand("Runtime.evaluate", eval_req, token);
             Assert.True(eval_res.IsErr);
             Assert.Equal("Uncaught", eval_res.Error["exceptionDetails"]?["text"]?.Value<string>());
         }
@@ -199,7 +199,7 @@ namespace DebuggerTests
             });
 
             var task = insp.WaitFor("Runtime.exceptionThrown");
-            var eval_res = await cli.SendCommand("Runtime.evaluate", eval_req, token);
+            var eval_res = await SendCommand("Runtime.evaluate", eval_req, token);
             // Response here will be the id for the timer from JS!
             Assert.True(eval_res.IsOk);
 
@@ -390,7 +390,7 @@ namespace DebuggerTests
                        objectId = "dotnet:scope:23490871",
                    });
 
-                   var frame_props = await cli.SendCommand("Runtime.getProperties", get_prop_req, token);
+                   var frame_props = await SendCommand("Runtime.getProperties", get_prop_req, token);
                    Assert.True(frame_props.IsErr);
                }
             );
@@ -579,7 +579,6 @@ namespace DebuggerTests
             {
                 var locals = await GetProperties(pause_location["callFrames"][0]["callFrameId"].Value<string>());
                 var dt = new DateTime(2310, 1, 2, 3, 4, 5);
-                Console.WriteLine(locals);
 
                 await CheckProps(locals, new
                 {
@@ -672,7 +671,6 @@ namespace DebuggerTests
                 $"'{entry_method_name}'," +
                 (call_other ? "true" : "false") +
                 "); }, 1);";
-            Console.WriteLine($"{eval_expr}");
 
             var pause_location = await EvaluateAndCheck(eval_expr, debugger_test_loc, line, col, invoke_async ? "MoveNext" : method_name);
 
@@ -812,7 +810,7 @@ namespace DebuggerTests
 
             async Task<string> CreateNewId(string expr)
             {
-                var res = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = expr }), token);
+                var res = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = expr }), token);
                 Assert.True(res.IsOk, "Expected Runtime.evaluate to succeed");
                 AssertEqual("string", res.Value["result"]?["type"]?.Value<string>(), "Expected Runtime.evaluate to return a string type result");
                 return res.Value["result"]?["value"]?.Value<string>();
@@ -821,7 +819,7 @@ namespace DebuggerTests
             async Task<Result> _invoke_getter(string obj_id, string property_name, bool expect_ok)
             {
                 var expr = $"MONO._invoke_getter ('{obj_id}', '{property_name}')";
-                var res = await cli.SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = expr }), token);
+                var res = await SendCommand("Runtime.evaluate", JObject.FromObject(new { expression = expr }), token);
                 AssertEqual(expect_ok, res.IsOk, "Runtime.evaluate result not as expected for {expr}");
 
                 return res;
@@ -994,7 +992,7 @@ namespace DebuggerTests
                 expression = $"{{ let asm_b64 = '{asm_base64}'; let pdb_b64 = '{pdb_base64}'; invoke_static_method('[debugger-test] LoadDebuggerTest:LoadLazyAssembly', asm_b64, pdb_b64); }}"
             });
 
-            Result load_assemblies_res = await cli.SendCommand("Runtime.evaluate", load_assemblies, token);
+            Result load_assemblies_res = await SendCommand("Runtime.evaluate", load_assemblies, token);
             Assert.True(load_assemblies_res.IsOk);
         }
 
