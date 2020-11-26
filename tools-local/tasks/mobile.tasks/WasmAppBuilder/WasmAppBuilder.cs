@@ -189,7 +189,7 @@ public class WasmAppBuilder : Task
             File.Copy(Path.Join (runtimeSourceDir, f), Path.Join(AppDir, f), true);
         File.Copy(MainJS!, Path.Join(AppDir, "runtime.js"),  true);
 
-        var html = @"<html><body><script type=""text/javascript"" src=""runtime.js""></script></body></html>";
+        var html = @"<html><body><script type=""text/javascript"" src=""runtime.js""></script><button id='start' onClick='App.init()'>Start</button></body></html>";
         File.WriteAllText(Path.Join(AppDir, "index.html"), html);
 
         foreach (var assembly in _assemblies.Values) {

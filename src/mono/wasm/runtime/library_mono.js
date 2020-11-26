@@ -1662,6 +1662,7 @@ var MonoSupportLib = {
 		//      "auto" (default): if "icu" behavior assets are present, use ICU, otherwise invariant.
 		//    diagnostic_tracing: (optional) enables diagnostic log messages during startup
 		mono_load_runtime_and_bcl_args: function (args) {
+            console.log(`-- mono_load_runtime_and_bcl_args: ${JSON.stringify(args)}`);
 			try {
 				return this._load_assets_and_runtime (args);
 			} catch (exc) {
@@ -1753,7 +1754,7 @@ var MonoSupportLib = {
 				throw new Error ("loaded_cb not provided");
 
 			var ctx = {
-				tracing: args.diagnostic_tracing || false,
+				tracing: true,
 				pending_count: args.assets.length,
 				mono_wasm_add_assembly: Module.cwrap ('mono_wasm_add_assembly', 'number', ['string', 'number', 'number']),
 				mono_wasm_add_satellite_assembly: Module.cwrap ('mono_wasm_add_satellite_assembly', 'void', ['string', 'string', 'number', 'number']),

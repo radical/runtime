@@ -69,7 +69,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         public async Task<BrowserSession> OpenSession(string relativeUrl,
                                             Func<string, JObject, CancellationToken, Task> onMessage,
-                                            Action<(RunLoopStopReason reason, Exception? ex)> onRunLoopFailedOrCanceled,
+                                            Action<(RunLoopStopReason reason, Exception? ex)> onRunLoopStopped,
                                             string testId,
                                             ILogger logger,
                                             CancellationTokenSource cts,
@@ -80,7 +80,7 @@ namespace Microsoft.WebAssembly.Diagnostics
             if (connection == null)
             {
                 connection = await OpenConnection(testId, logger);
-                connection.InspectorClient!.RunLoopStopped += (_, args) => onRunLoopFailedOrCanceled(args);
+                connection.InspectorClient!.RunLoopStopped += (_, args) => onRunLoopStopped(args);
             }
 
             var session = await connection.OpenSession(//this,

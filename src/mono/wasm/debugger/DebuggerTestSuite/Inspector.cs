@@ -18,13 +18,13 @@ namespace DebuggerTests
 {
     class Inspector
     {
-        Dictionary<string, TaskCompletionSource<JObject>> notifications = new Dictionary<string, TaskCompletionSource<JObject>>();
-        Dictionary<string, Func<JObject, CancellationToken, Task>> eventListeners = new Dictionary<string, Func<JObject, CancellationToken, Task>>();
+        Dictionary<string, TaskCompletionSource<JObject>> notifications = new ();
+        Dictionary<string, Func<JObject, CancellationToken, Task>> eventListeners = new ();
 
         public const string PAUSE = "pause";
         public const string READY = "ready";
         public CancellationToken Token => _cancellationTokenSource.Token;
-        public InspectorClient? Client { get; private set; }
+        // public InspectorClient? Client { get; private set; }
 
         public BrowserSession? Session { get; private set; }
 
@@ -156,7 +156,7 @@ namespace DebuggerTests
                                             _logger,
                                             _cancellationTokenSource);
 
-                Client = Session.Connection.InspectorClient;
+                // Client = Session.Connection.InspectorClient;
 
                 // await Client.Connect(uri, OnMessage, _cancellationTokenSource.Token);
                 // Client.RunLoopStopped += (_, args) =>
@@ -206,6 +206,7 @@ namespace DebuggerTests
 
             void RunLoopStoppedHandler((RunLoopStopReason reason, Exception? ex) args)
             {
+                _logger.LogDebug($"Inspector: RunLoop stopped: {args.reason}, {args.ex}");
                 switch (args.reason)
                 {
                     case RunLoopStopReason.Exception:

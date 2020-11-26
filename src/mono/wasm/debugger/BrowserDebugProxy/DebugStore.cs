@@ -378,6 +378,19 @@ namespace Microsoft.WebAssembly.Diagnostics
         public override string ToString() => "TypeInfo('" + FullName + "')";
     }
 
+    internal class CustomAssemblyResolver : DefaultAssemblyResolver
+    {
+        private ILogger _logger;
+        public CustomAssemblyResolver(ILogger logger)
+            => _logger = logger;
+
+        public void Register(AssemblyDefinition asm_def)
+        {
+            _logger.LogDebug($"CustomAssemblyResolver:Register: {asm_def}");
+            RegisterAssembly(asm_def);
+        }
+    }
+
     internal class AssemblyInfo
     {
         private static int next_id;
@@ -438,6 +451,8 @@ namespace Microsoft.WebAssembly.Diagnostics
 
                 this.image = ModuleDefinition.ReadModule(new MemoryStream(assembly), rp);
             }
+
+            ((CustomAssemblyResolver)resolver).Register(this.image.Assembly);
 
             Populate();
         }
@@ -739,7 +754,19 @@ namespace Microsoft.WebAssembly.Diagnostics
         {
             this.client = client;
             this.logger = logger;
-            this.resolver = new DefaultAssemblyResolver();
+            this.resolver = new CustomAssemblyResolver(logger);
+            ((DefaultAssemblyResolver)resolver).ResolveFailure += (_, name) =>
+            {
+                logger.LogDebug($"AssemblyResolve failed: {name}");
+
+                foreach (var dir in ((DefaultAssemblyResolver)resolver).GetSearchDirectories())
+                {
+                    logger.LogDebug($"\tsdir: {dir}");
+                    foreach (var f in Directory.GetFiles(dir))
+                        Console.WriteLine ($"\t\tf: {f}");
+                }
+                return null;
+            };
         }
 
         public DebugStore(ILogger logger) : this(logger, new HttpClient())
@@ -792,6 +819,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                     asm_files.Add(file_name);
             }
 
+
             List<DebugItem> steps = new List<DebugItem>();
             foreach (string url in asm_files)
             {
@@ -819,11 +847,12 @@ namespace Microsoft.WebAssembly.Diagnostics
                 try
                 {
                     byte[][] bytes = await step.Data.ConfigureAwait(false);
+                    logger.LogDebug($"Loading {step.Url}, pdb: {bytes[1]?.Length > 0}");
                     assembly = new AssemblyInfo(this.resolver, step.Url, bytes[0], bytes[1]);
                 }
                 catch (Exception e)
                 {
-                    logger.LogDebug($"Failed to load {step.Url} ({e.Message})");
+                    logger.LogDebug($"Failed to load {step.Url} ({e.ToString()})");
                 }
                 if (assembly == null)
                     continue;
@@ -833,6 +862,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                     logger.LogDebug($"Skipping loading {assembly.Name} into the debug store, as it already exists");
                     continue;
                 }
+                logger.LogDebug($"Loaded {step.Url}, {assembly.AssemblyNameUnqualified} {assembly.Name}");
 
                 assemblies.Add(assembly);
                 foreach (SourceFile source in assembly.Sources)

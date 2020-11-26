@@ -11,14 +11,29 @@ public class SimpleWasmTestRunner : WasmApplicationEntryPoint
 {
     public static async Task<int> Main(string[] args)
     {
-        var testAssembly = args[0];
+        return await RunMain(args ?? new string[]{});
+    }
+
+    public static async Task<int> RunMain(string[] args)
+    {
+        if (args == null)
+        {
+            args = new string[0];
+
+        }
+        Console.WriteLine ($"RunMain: args: {args?.Length}");
+        if (args != null)
+            foreach (var arg in args)
+                Console.WriteLine ($"   arg: {arg}");
+
+        var testAssembly = args?[0];
         var excludedTraits = new List<string>();
         var includedTraits = new List<string>();
         var includedNamespaces = new List<string>();
         var includedClasses = new List<string>();
         var includedMethods = new List<string>();
 
-        for (int i = 1; i < args.Length; i++)
+        for (int i = 1; i < args?.Length; i++)
         {
             var option = args[i];
             switch (option)
@@ -50,7 +65,7 @@ public class SimpleWasmTestRunner : WasmApplicationEntryPoint
 
         var runner = new SimpleWasmTestRunner()
         {
-            TestAssembly = testAssembly,
+            TestAssembly = testAssembly ?? String.Empty,
             ExcludedTraits = excludedTraits,
             IncludedTraits = includedTraits,
             IncludedNamespaces = includedNamespaces,

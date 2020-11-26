@@ -223,6 +223,9 @@ var Module = {
 			Module.ccall ('mono_wasm_enable_on_demand_gc', 'void', ['number'], [0]);
 		}
 
+				MONO.mono_wasm_setenv ("MONO_LOG_LEVEL", "debug");
+		MONO.mono_wasm_setenv ("MONO_LOG_MASK", "all");
+
 		config.loaded_cb = function () {
 			let wds = FS.stat (working_dir);
 			if (wds === undefined || !FS.isDir (wds.mode)) {

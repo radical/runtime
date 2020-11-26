@@ -24,6 +24,16 @@ namespace Microsoft.WebAssembly.Diagnostics
     {
         public static void Main(string[] args)
         {
+            Uri devToolsUri = new ($"http://localhost:9222");
+            if (args.Length >= 1)
+                devToolsUri = new Uri($"http://localhost:{args[0]}");
+
+            string proxyUrl = "http://127.0.0.1:0";
+            if (args.Length >= 2)
+                proxyUrl = $"http://127.0.0.1:{args[1]}";
+
+            Console.WriteLine ($"Chrome devtools: {devToolsUri}");
+
             IWebHost host = new WebHostBuilder()
                 .UseSetting("UseIISIntegration", false.ToString())
                 .UseKestrel()
@@ -33,7 +43,14 @@ namespace Microsoft.WebAssembly.Diagnostics
                 {
                     config.AddCommandLine(args);
                 })
-                .UseUrls("http://127.0.0.1:0")
+                .ConfigureServices(services =>
+                {
+                    services.Configure<ProxyOptions>(options =>
+                    {
+                        options.DevToolsUrl = devToolsUri;
+                    });
+                })
+                .UseUrls(proxyUrl)
                 .Build();
 
             host.Run();

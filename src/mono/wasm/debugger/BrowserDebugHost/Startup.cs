@@ -154,7 +154,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                     try
                     {
                         using ILoggerFactory loggerFactory = LoggerFactory.Create(
-                            builder => builder.AddConsole().AddFilter(null, LogLevel.Information));
+                            builder => builder.AddConsole().AddFilter(null, LogLevel.Debug));
 
                         context.Request.Query.TryGetValue("urlSymbolServer", out StringValues urlSymbolServerList);
                         var proxy = new DebuggerProxy(loggerFactory, urlSymbolServerList.ToList());

@@ -116,7 +116,7 @@ namespace Microsoft.WebAssembly.Diagnostics
             pending_cmds[new MessageId(sessionId.sessionId, id)] = tcs;
 
             var str = o.ToString();
-            logger.LogDebug($"SendCommand: id: {id} method: {method} params: {args}");
+            // logger.LogDebug($"SendCommand: id: {id} method: {method} params: {args}");
             // Console.WriteLine($"SendCommand: id: {id} method: {method} params: {args}");
 
             var bytes = Encoding.UTF8.GetBytes(str);

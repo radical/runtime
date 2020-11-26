@@ -18,6 +18,14 @@ if [ -z "$XHARNESS_COMMAND" ]; then
 	XHARNESS_COMMAND="test"
 fi
 
+DEBUG_PROXY_PROJ=$HOME/dev/runtime/src/mono/wasm/debugger/BrowserDebugHost/BrowserDebugHost.csproj
+DEBUG_PROXY_PORT=9300
+BROWSER_DEBUG_PORT=9222
+XHARNESS_ARGS="$XHARNESS_ARGS --debug-port=$BROWSER_DEBUG_PORT"
+
+dotnet run -p $DEBUG_PROXY_PROJ $BROWSER_DEBUG_PORT $DEBUG_PROXY_PORT &
+echo $?
+
 # RunCommands defined in tests.mobile.targets
 [[RunCommands]]
 

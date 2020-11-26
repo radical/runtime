@@ -50,6 +50,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         protected override async Task<bool> AcceptEvent(SessionId sessionId, string method, JObject args, CancellationToken token)
         {
+            //logger.LogDebug($"AcceptEvent: {method}");
             switch (method)
             {
                 case "Runtime.consoleAPICalled":
@@ -159,7 +160,7 @@ namespace Microsoft.WebAssembly.Diagnostics
                             case var _ when url == "":
                             case var _ when url.StartsWith("wasm://", StringComparison.Ordinal):
                                 {
-                                    Log("verbose", $"ignoring wasm: Debugger.scriptParsed {url}");
+                                    Log("verbose", $"ignoring wasm: Debugger.scriptParsed url: {url}");
                                     return true;
                                 }
                         }
@@ -195,7 +196,7 @@ namespace Microsoft.WebAssembly.Diagnostics
 
         protected override async Task<bool> AcceptCommand(MessageId id, string method, JObject args, CancellationToken token)
         {
-            logger.LogDebug($"AcceptCommand {method}");
+            //logger.LogDebug($"AcceptCommand {method}");
             // Inspector doesn't use the Target domain or sessions
             // so we try to init immediately
             if (id == SessionId.Null)
