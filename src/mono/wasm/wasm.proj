@@ -13,6 +13,7 @@
     <MicrosoftNetCoreAppRuntimePackNativeDir>$([MSBuild]::NormalizeDirectory('$(MicrosoftNetCoreAppRuntimePackRidDir)', 'native'))</MicrosoftNetCoreAppRuntimePackNativeDir>
     <WasmEnableES6 Condition="'$(WasmEnableES6)' == ''">false</WasmEnableES6>
     <FilterSystemTimeZones Condition="'$(FilterSystemTimeZones)' == ''">false</FilterSystemTimeZones>
+    <EMSDK_PATH Condition="'$(EMSDK_PATH)' == ''">$(MSBuildThisFileDirectory)\emsdk</EMSDK_PATH>
   </PropertyGroup>
 
   <Target Name="CheckEnv">

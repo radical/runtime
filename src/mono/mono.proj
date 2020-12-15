@@ -44,6 +44,7 @@
     <MonoCCompiler Condition="$(MonoCCompiler.StartsWith('-'))">$(MonoCCompiler.TrimStart('-'))</MonoCCompiler>
     <MonoCxxCompiler Condition="'$(MonoCCompiler)' == 'clang'">clang++</MonoCxxCompiler>
     <MonoCxxCompiler Condition="'$(MonoCCompiler)' == 'gcc'">g++</MonoCxxCompiler>
+    <EMSDK_PATH Condition="'$(EMSDK_PATH)' == ''">$(MSBuildThisFileDirectory)\wasm\emsdk</EMSDK_PATH>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetsBrowser)' == 'true'">

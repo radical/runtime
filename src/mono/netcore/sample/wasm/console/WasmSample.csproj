@@ -16,6 +16,7 @@
     <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
     <RunAnalyzers>false</RunAnalyzers>
     <RunAOTCompilation Condition="'$(RunAOTCompilation)' == ''">false</RunAOTCompilation>
+    <EMSDK_PATH Condition="'$(EMSDK_PATH)' == ''">$(MonoProjectRoot)\wasm\emsdk</EMSDK_PATH>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' != 'Debug'">

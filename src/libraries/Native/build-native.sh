@@ -49,8 +49,7 @@ source "$__RepoRootDir"/eng/native/build-commons.sh
 
 if [[ "$__BuildArch" == wasm ]]; then
     if [[ -z "$EMSDK_PATH" ]]; then
-        echo "Error: You need to set the EMSDK_PATH environment variable pointing to the emscripten SDK root."
-        exit 1
+        EMSDK_PATH=$__RepoRootDir/src/mono/wasm/emsdk
     fi
     source "$EMSDK_PATH"/emsdk_env.sh
 
