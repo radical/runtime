@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "workloads": {
+    "microsoft-net-sdk-webassembly": {
+      "description": "WebAssembly workload",
+      "packs": [
+        "Microsoft.NET.Runtime.MonoAOTCompiler.Task",
+        "Microsoft.NET.Runtime.WebAssembly.Sdk",
+        "Microsoft.Netcore.App.Runtime.Aot.Cross.browser-wasm",
+        "Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Node",
+        "Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Python",
+        "Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Sdk"
+      ]
+    }
+  },
+  "packs": {
+    "Microsoft.NET.Runtime.MonoAOTCompiler.Task": {
+      "kind": "Sdk",
+      "version": "${PackageVersion}"
+    },
+    "Microsoft.NET.Runtime.WebAssembly.Sdk": {
+      "kind": "Sdk",
+      "version": "${PackageVersion}"
+    },
+    "Microsoft.NETCore.App.Runtime.AOT.Cross.browser-wasm": {
+      "kind": "Sdk",
+      "version": "${PackageVersion}",
+      "alias-to": {
+        "win-x86": "microsoft.netcore.app.runtime.aot.win-x86.cross.browser-wasm",
+        "win-x64": "microsoft.netcore.app.runtime.aot.win-x64.cross.browser-wasm",
+        "linux-x64": "microsoft.netcore.app.runtime.aot.linux-x64.cross.browser-wasm",
+        "osx-x64": "microsoft.netcore.app.runtime.aot.osx-x64.cross.browser-wasm"
+      }
+    },
+    "Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Node": {
+      "kind": "Sdk",
+      "version": "${MicrosoftNETRuntimeEmscriptenVersion}",
+      "alias-to": {
+        "win-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.node.win-x64",
+        "linux-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.node.linux-x64",
+        "osx-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.node.osx-x64"
+      }
+    },
+    "Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Python": {
+      "kind": "Sdk",
+      "version": "${MicrosoftNETRuntimeEmscriptenVersion}",
+      "alias-to": {
+        "win-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.python.win-x64",
+        "osx-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.python.osx-x64"
+      }
+    },
+    "Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Sdk": {
+      "kind": "Sdk",
+      "version": "${MicrosoftNETRuntimeEmscriptenVersion}",
+      "alias-to": {
+        "win-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.sdk.win-x64",
+        "linux-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.sdk.linux-x64",
+        "osx-x64": "microsoft.net.runtime.emscripten.${EmscriptenVersion}.sdk.osx-x64"
+      }
+    }
+  }
+}

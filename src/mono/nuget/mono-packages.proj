@@ -11,6 +11,7 @@
     <ProjectReference Include="Microsoft.NET.Runtime.wasm.Sample.Mono\Microsoft.NET.Runtime.wasm.Sample.Mono.pkgproj" />
     <ProjectReference Include="Microsoft.NETCore.BrowserDebugHost.Transport\Microsoft.NETCore.BrowserDebugHost.Transport.pkgproj" />
     <ProjectReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk\Microsoft.NET.Runtime.WebAssembly.Sdk.pkgproj" />
+    <ProjectReference Include="Microsoft.NET.Workload.WebAssembly\Microsoft.NET.Workload.WebAssembly.pkgproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetOS)' == 'iOS' or '$(TargetOS)' == 'iOSSimulator'">

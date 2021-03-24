@@ -1,0 +1,11 @@
+<Project>
+    <ImportGroup Condition="'$(IsWasmApp)' == 'true'">
+      <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.MonoAOTCompiler.Task" />
+      <Import Project="Sdk.targets" Sdk="Microsoft.NET.Runtime.WebAssembly.Sdk" />
+      <Import Project="Sdk.props" Sdk="Microsoft.Netcore.App.Runtime.Aot.Cross.browser-wasm" />
+
+      <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Python" />
+      <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Node" />
+      <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Sdk" />
+    </ImportGroup>
+</Project>
