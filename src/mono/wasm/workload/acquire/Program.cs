@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -26,20 +26,44 @@ namespace acquire
             return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(depsFile), "..", "..", "..", "dotnet" + (OperatingSystem.IsWindows() ? ".exe" : "")));
         }
 
-        private static int Main(string[] args)
+        public static int Main(string[] args)
         {
-            var sdkDirectory = args.Length > 0 ? args[0] : Path.GetDirectoryName(MuxerPath);
+            Console.WriteLine(MuxerPath);
+            string sdkDirectory = Path.GetDirectoryName(MuxerPath);
             var tempDirectory = Path.Combine(Directory.GetCurrentDirectory(), "tmp", Path.GetRandomFileName());
             var restoreDirectory = Path.Combine(tempDirectory, ".nuget");
+            string runtimeVersion = null;
+            string manifestPath = null;
+            string workloadName = null;
+
+            foreach (var arg in args) {
+                if (arg.StartsWith ("--runtime="))
+                    runtimeVersion = arg.Replace ("--runtime=", "");
+                else if (arg.StartsWith ("--manifest"))
+                    manifestPath = arg.Replace ("--manifest=", "");
+                else if (arg.StartsWith ("--workload"))
+                    workloadName = arg.Replace ("--workload=", "");
+                else
+                    sdkDirectory = arg;
+            }
+
+            if (string.IsNullOrEmpty(workloadName))
+            {
+                Console.WriteLine ($"Missing --workload=<workload_name> argument");
+                return 1;
+            }
 
             try
             {
-                var packs = GetPacks(sdkDirectory);
-                var restore = RestorePacks(tempDirectory, restoreDirectory, packs);
+                var restore = Restore(tempDirectory, restoreDirectory, runtimeVersion, manifestPath, workloadName, out var packs);
                 if (restore != 0)
                 {
                     return restore;
                 }
+
+                var sourceManifestDirectory = Path.Combine(restoreDirectory, workloadName.ToLower(), ManifestVersion);
+                var targetManifestDirectory = Path.Combine(sdkDirectory, "sdk-manifests", ManifestVersion, workloadName);
+                Move(sourceManifestDirectory, targetManifestDirectory);
 
                 foreach (var (id, version) in packs)
                 {
@@ -58,13 +82,13 @@ namespace acquire
                 sdkVersionProc.WaitForExit();
                 var sdkVersion = sdkVersionProc.StandardOutput.ReadToEnd().Trim();
                 var sentinelPath = Path.Combine(sdkDirectory, "sdk", sdkVersion, "EnableWorkloadResolver.sentinel");
-                Console.WriteLine($"Enabling Workloads support in dotnet SDK v{sdkVersion}.");
+                Console.WriteLine($"Writing sentinel to {sentinelPath}.");
 
                 File.WriteAllBytes(sentinelPath, Array.Empty<byte>());
             }
             finally
             {
-                Directory.Delete(tempDirectory, recursive: true);
+                //Directory.Delete(tempDirectory, recursive: true);
             }
 
             return 0;
@@ -83,17 +107,67 @@ namespace acquire
             Directory.Move(source, destination);
         }
 
-        private static List<(string Id, string Version)> GetPacks(string sdkDirectory)
+        private static int Restore(string tempDirectory, string restoreDirectory, string runtimeVersion, string manifestPath, string workloadName, out List<(string, string)> packs)
         {
-            var manifestDirectory = Path.Combine(sdkDirectory, "sdk-manifests", ManifestVersion, "Microsoft.NET.Sdk.BlazorWebAssembly.AOT");
-            if (!Directory.Exists(manifestDirectory))
+            packs = null;
+
+            var restoreProject = Path.Combine(tempDirectory, "restore", "Restore.csproj");
+            var restoreProjectDirectory = Directory.CreateDirectory(Path.GetDirectoryName(restoreProject));
+
+            File.WriteAllText(Path.Combine(restoreProjectDirectory.FullName, "Directory.Build.props"), "<Project />");
+            File.WriteAllText(Path.Combine(restoreProjectDirectory.FullName, "Directory.Build.targets"), "<Project />");
+
+            var projectFile = $@"
+<Project Sdk=""Microsoft.NET.Sdk"">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include=""{workloadName}"" Version=""6.0.0-*"" />
+    </ItemGroup>
+</Project>
+";
+            File.WriteAllText(restoreProject, projectFile);
+
+            Console.WriteLine("Restoring...");
+
+            var process = Process.Start(new ProcessStartInfo
             {
-                throw new DirectoryNotFoundException($"Cound not find directory {manifestDirectory}. A 6.0-preview3 SDK or newer is required for this tool to function.");
+                FileName = MuxerPath,
+                ArgumentList = { "restore", restoreProject },
+                Environment =
+                {
+                    ["NUGET_PACKAGES"] = restoreDirectory,
+                },
+            });
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                Console.Error.WriteLine($"Unable to restore {workloadName} workload.");
+                return 1;
             }
 
-            var manifestPath = Path.Combine(manifestDirectory, "WorkloadManifest.json");
+            var manifestDirectory = Path.Combine(restoreDirectory, workloadName.ToLower());
+            var version = Directory.EnumerateDirectories(manifestDirectory).First();
+
+            manifestDirectory = Path.Combine(manifestDirectory, ManifestVersion);
+            Directory.Move(version, manifestDirectory);
+
+            if (manifestPath != null)
+                File.Copy(Path.GetFullPath(manifestPath), Path.Combine(manifestDirectory, "WorkloadManifest.json"), true);
+
+            var manifestPath2 = Path.Combine(manifestDirectory, "WorkloadManifest.json");
             var manifest = JsonSerializer.Deserialize<PackInformation>(File.ReadAllBytes(manifestPath), new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            var packs = new List<(string, string)>();
+
+            projectFile = @"
+<Project Sdk=""Microsoft.NET.Sdk"">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <NoWarn>$(NoWarn);NU1213</NoWarn>
+    </PropertyGroup>
+    <ItemGroup>
+";
+            packs = new List<(string id, string version)>();
             foreach (var item in manifest.Packs)
             {
                 var packageName = item.Key;
@@ -113,34 +187,15 @@ namespace acquire
                     }
                     else
                     {
-                        throw new NotSupportedException("Unsupported OS platform.");
+                        Console.Error.WriteLine("Unsupported platform.");
+                        return 1;
                     }
                 }
-                packs.Add((packageName, item.Value.Version));
-            }
-
-            return packs;
-        }
-
-        private static int RestorePacks(string tempDirectory, string restoreDirectory, List<(string Id, string Version)> packs)
-        {
-            var restoreProject = Path.Combine(tempDirectory, "restore", "Restore.csproj");
-            var restoreProjectDirectory = Directory.CreateDirectory(Path.GetDirectoryName(restoreProject));
-
-            File.WriteAllText(Path.Combine(restoreProjectDirectory.FullName, "Directory.Build.props"), "<Project />");
-            File.WriteAllText(Path.Combine(restoreProjectDirectory.FullName, "Directory.Build.targets"), "<Project />");
-
-            var projectFile = @"
-<Project Sdk=""Microsoft.NET.Sdk"">
-    <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
-        <NoWarn>$(NoWarn);NU1213</NoWarn>
-    </PropertyGroup>
-    <ItemGroup>
-";
-            foreach (var (Id, Version) in packs)
-            {
-                projectFile += $"<PackageReference Include=\"{Id}\" Version=\"{Version}\" />";
+                var version2 = runtimeVersion ?? item.Value.Version;
+                //version2 = "6.0.0-preview.4.21174.6";
+                var name = packageName.Contains("cross") && false ? "FrameworkReference" : "PackageReference";
+                projectFile += $"<{name} Include=\"{packageName}\" Version=\"{version2}\" />";
+                packs.Add((packageName, version2));
             }
 
             projectFile += @"
@@ -149,20 +204,20 @@ namespace acquire
 ";
             File.WriteAllText(restoreProject, projectFile);
 
-            var process = Process.Start(new ProcessStartInfo
+            process = Process.Start(new ProcessStartInfo
             {
                 FileName = MuxerPath,
                 ArgumentList = { "restore", restoreProject },
-#if !DEBUG
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
-#endif
                 Environment =
                 {
                     ["NUGET_PACKAGES"] = restoreDirectory,
                 },
             });
             process.WaitForExit();
+
+
             return 0;
         }
 
