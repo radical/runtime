@@ -5,7 +5,8 @@
     <PackageDescription>Workload for WebAssembly applications</PackageDescription>
 
     <EmscriptenVersion>2.0.12</EmscriptenVersion>
-    <WorkloadManifestPath>$(IntermediateOutputPath)workload\WorkloadManifest.json</WorkloadManifestPath>
+    <WorkloadManifestJsonPath>$(IntermediateOutputPath)workload\WorkloadManifest.json</WorkloadManifestJsonPath>
+    <WorkloadManifestTargetsPath>$(IntermediateOutputPath)workload\WorkloadManifest.targets</WorkloadManifestTargetsPath>
     <MicrosoftNETRuntimeEmscriptenVersion>6.0.0-preview.3.21169.6</MicrosoftNETRuntimeEmscriptenVersion>
   </PropertyGroup>
 
@@ -19,11 +20,16 @@
     <GenerateFileFromTemplate
       TemplateFile="$(MSBuildThisFileDirectory)WorkloadManifest.json.in"
       Properties="@(_WorkloadManifestValues)"
-      OutputPath="$(WorkloadManifestPath)" />
+      OutputPath="$(WorkloadManifestJsonPath)" />
+
+    <GenerateFileFromTemplate
+      TemplateFile="$(MSBuildThisFileDirectory)WorkloadManifest.targets.in"
+      Properties="@(_WorkloadManifestValues)"
+      OutputPath="$(WorkloadManifestTargetsPath)" />
 
     <ItemGroup>
-      <PackageFile Include="$(WorkloadManifestPath)" TargetPath="build" />
-      <PackageFile Include="WorkloadManifest.targets" TargetPath="build" />
+      <PackageFile Include="$(WorkloadManifestJsonPath)" />
+      <PackageFile Include="$(WorkloadManifestTargetsPath)" />
     </ItemGroup>
   </Target>
 

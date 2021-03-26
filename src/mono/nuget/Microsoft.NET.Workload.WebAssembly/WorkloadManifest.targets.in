@@ -1,10 +1,16 @@
 <Project>
-    <ImportGroup Condition="'$(IsWasmApp)' == 'true'">
+    <PropertyGroup>
+        <WasmWorkloadInstalled>true</WasmWorkloadInstalled>
+    </PropertyGroup>
+
+    <ImportGroup Condition="'$(UseWasmWorkload)' == 'true'">
       <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.MonoAOTCompiler.Task" />
       <Import Project="Sdk.targets" Sdk="Microsoft.NET.Runtime.WebAssembly.Sdk" />
       <Import Project="Sdk.props" Sdk="Microsoft.Netcore.App.Runtime.Aot.Cross.browser-wasm" />
 
-      <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Python" />
+      <!-- emscripten uses system python on linux -->
+      <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Python" Condition="!$([MSBuild]::IsOSPlatform('linux'))" />
+
       <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Node" />
       <Import Project="Sdk.props" Sdk="Microsoft.NET.Runtime.Emscripten.${EmscriptenVersion}.Sdk" />
     </ImportGroup>

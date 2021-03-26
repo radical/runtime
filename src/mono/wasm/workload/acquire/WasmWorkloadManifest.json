@@ -16,15 +16,15 @@
   "packs": {
     "Microsoft.NET.Runtime.MonoAOTCompiler.Task": {
       "kind": "Sdk",
-      "version": "6.0.0-preview.4.21174.6"
+      "version": "6.0.0-dev"
     },
     "Microsoft.NET.Runtime.WebAssembly.Sdk": {
       "kind": "Sdk",
-      "version": "6.0.0-preview.4.21174.6"
+      "version": "6.0.0-dev"
     },
     "Microsoft.NETCore.App.Runtime.AOT.Cross.browser-wasm": {
       "kind": "Sdk",
-      "version": "6.0.0-preview.4.21174.6",
+      "version": "6.0.0-dev",
       "alias-to": {
         "win-x86": "microsoft.netcore.app.runtime.aot.win-x86.cross.browser-wasm",
         "win-x64": "microsoft.netcore.app.runtime.aot.win-x64.cross.browser-wasm",
@@ -34,7 +34,7 @@
     },
     "Microsoft.NET.Runtime.Emscripten.2.0.12.Node" : {
       "kind": "Sdk",
-      "version": "6.0.0-preview.3.21174.2",
+      "version": "6.0.0-ci",
       "alias-to": {
         "win-x86": "Microsoft.NET.Runtime.Emscripten.2.0.12.Node.win-x86",
         "win-x64": "Microsoft.NET.Runtime.Emscripten.2.0.12.Node.win-x64",
@@ -44,7 +44,7 @@
     },
     "Microsoft.NET.Runtime.Emscripten.2.0.12.Python" : {
       "kind": "Sdk",
-      "version": "6.0.0-preview.3.21174.2",
+      "version": "6.0.0-ci",
       "alias-to": {
         "win-x86": "Microsoft.NET.Runtime.Emscripten.2.0.12.Python.win-x86",
         "win-x64": "Microsoft.NET.Runtime.Emscripten.2.0.12.Python.win-x64",
@@ -54,7 +54,7 @@
     },
     "Microsoft.NET.Runtime.Emscripten.2.0.12.Sdk" : {
       "kind": "Sdk",
-      "version": "6.0.0-preview.3.21174.2",
+      "version": "6.0.0-ci",
       "alias-to": {
         "win-x86": "Microsoft.NET.Runtime.Emscripten.2.0.12.Sdk.win-x86",
         "win-x64": "Microsoft.NET.Runtime.Emscripten.2.0.12.Sdk.win-x64",
