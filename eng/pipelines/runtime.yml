@@ -60,106 +60,106 @@ jobs:
 # Build CoreCLR checked
 # Only when CoreCLR is changed
 #
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
-    buildConfig: checked
-    platforms:
-    - Linux_x64
-    - Linux_arm
-    - Linux_arm64
-    - Linux_musl_arm
-    - Linux_musl_arm64
-    - Linux_musl_x64
-    - OSX_arm64
-    - windows_x86
-    - windows_x64
-    - windows_arm
-    - windows_arm64
-    jobParameters:
-      testGroup: innerloop
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_runtimetests.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
+    #buildConfig: checked
+    #platforms:
+    #- Linux_x64
+    #- Linux_arm
+    #- Linux_arm64
+    #- Linux_musl_arm
+    #- Linux_musl_arm64
+    #- Linux_musl_x64
+    #- OSX_arm64
+    #- windows_x86
+    #- windows_x64
+    #- windows_arm
+    #- windows_arm64
+    #jobParameters:
+      #testGroup: innerloop
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_runtimetests.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
-#
-# Build CoreCLR checked using GCC toolchain
-# Only when CoreCLR is changed
-#
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
-    buildConfig: checked
-    platforms:
-    - Linux_x64
-    jobParameters:
-      testGroup: innerloop
-      compilerName: gcc
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+##
+## Build CoreCLR checked using GCC toolchain
+## Only when CoreCLR is changed
+##
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
+    #buildConfig: checked
+    #platforms:
+    #- Linux_x64
+    #jobParameters:
+      #testGroup: innerloop
+      #compilerName: gcc
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
-#
-# Build CoreCLR OSX_x64 checked
-# Only when CoreCLR or Libraries is changed
-#
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
-    buildConfig: checked
-    platforms:
-    - OSX_x64
-    jobParameters:
-      testGroup: innerloop
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_runtimetests.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+##
+## Build CoreCLR OSX_x64 checked
+## Only when CoreCLR or Libraries is changed
+##
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
+    #buildConfig: checked
+    #platforms:
+    #- OSX_x64
+    #jobParameters:
+      #testGroup: innerloop
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_runtimetests.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
-#
-# Build CoreCLR release
-# Always as they are needed by Installer and we always build and test the Installer.
-#
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
-    buildConfig: release
-    platforms:
-    - OSX_arm64
-    - OSX_x64
-    - Linux_x64
-    - Linux_arm
-    - Linux_arm64
-    - Linux_musl_x64
-    - Linux_musl_arm
-    - Linux_musl_arm64
-    - windows_x64
-    - windows_x86
-    - windows_arm
-    - windows_arm64
-    - FreeBSD_x64
-    jobParameters:
-      testGroup: innerloop
+##
+## Build CoreCLR release
+## Always as they are needed by Installer and we always build and test the Installer.
+##
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
+    #buildConfig: release
+    #platforms:
+    #- OSX_arm64
+    #- OSX_x64
+    #- Linux_x64
+    #- Linux_arm
+    #- Linux_arm64
+    #- Linux_musl_x64
+    #- Linux_musl_arm
+    #- Linux_musl_arm64
+    #- windows_x64
+    #- windows_x86
+    #- windows_arm
+    #- windows_arm64
+    #- FreeBSD_x64
+    #jobParameters:
+      #testGroup: innerloop
 
-#
-# Build PGO CoreCLR release
-#
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
-    buildConfig: release
-    platforms:
-    - windows_x64
-    - windows_x86
-    - Linux_x64
-    jobParameters:
-      testGroup: innerloop
-      pgoType: 'PGO'
+##
+## Build PGO CoreCLR release
+##
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
+    #buildConfig: release
+    #platforms:
+    #- windows_x64
+    #- windows_x86
+    #- Linux_x64
+    #jobParameters:
+      #testGroup: innerloop
+      #pgoType: 'PGO'
 
 #
 # Build CoreCLR Formatting Job
