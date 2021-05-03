@@ -368,7 +368,11 @@ namespace DebuggerTests
 
                     o_null = TObject("object", is_null: true),
                     o_ia = TArray("int[]", 2),
-                }, "locals");
+                }, "locals", num_fields: 13);
+                Console.WriteLine ($"locals: {locals}");
+                Console.WriteLine ($"{TObject("object")}");
+                Console.WriteLine ($"with true: {TObject("object", is_null: true)}");
+                Console.WriteLine ($"with false: {TObject("object", is_null: false)}");
 
                 foreach (var name in new[] { "n_gs", "o_gs", "o_n_gs" })
                 {

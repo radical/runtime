@@ -124,7 +124,7 @@ namespace Wasm.Build.Tests
                 {
 #if TEST_DEBUG_CONFIG_ALSO
                     // list of each member data - for Debug+@aot
-                    new object?[] { new BuildArgs("placeholder", "Debug", aot, "placeholder", string.Empty) }.AsEnumerable(),
+                    // new object?[] { new BuildArgs("placeholder", "Debug", aot, "placeholder", string.Empty) }.AsEnumerable(),
 #endif
 
                     // list of each member data - for Release+@aot
@@ -139,7 +139,8 @@ namespace Wasm.Build.Tests
                     .WithRunHosts(host)
                     .UnwrapItemsAsArrays();
 
-        protected void RunAndTestWasmApp(BuildArgs buildArgs, RunHost host, string id, Action<string> test, string? buildDir=null, int expectedExitCode=0, string? args=null)
+        protected void RunAndTestWasmApp(BuildArgs buildArgs, RunHost host, string id, Action<string> test, string? buildDir=null, int expectedExitCode=0, string? args=null,
+                                            bool logToXUnit=true)
         {
             buildDir ??= _projectDir;
             Dictionary<string, string>? envVars = new();
@@ -168,7 +169,8 @@ namespace Wasm.Build.Tests
                                 envVars: envVars,
                                 expectedAppExitCode: expectedExitCode,
                                 extraXHarnessArgs: extraXHarnessArgs,
-                                appArgs: args);
+                                appArgs: args,
+                                logToXUnit: logToXUnit);
 
             if (buildArgs.AOT)
             {
@@ -184,7 +186,8 @@ namespace Wasm.Build.Tests
 
         protected static string RunWithXHarness(string testCommand, string testLogPath, string projectName, string bundleDir,
                                         ITestOutputHelper _testOutput, IDictionary<string, string>? envVars=null,
-                                        int expectedAppExitCode=0, int xharnessExitCode=0, string? extraXHarnessArgs=null, string? appArgs=null)
+                                        int expectedAppExitCode=0, int xharnessExitCode=0, string? extraXHarnessArgs=null, string? appArgs=null,
+                                        bool logToXUnit=true)
         {
             Console.WriteLine($"============== {testCommand} =============");
             Directory.CreateDirectory(testLogPath);
@@ -213,7 +216,8 @@ namespace Wasm.Build.Tests
                                         args: args.ToString(),
                                         workingDir: bundleDir,
                                         envVars: envVars,
-                                        label: testCommand);
+                                        label: testCommand,
+                                        logToXUnit: logToXUnit);
 
             File.WriteAllText(Path.Combine(testLogPath, $"xharness.log"), output);
 
