@@ -83,7 +83,8 @@ namespace Wasm.Build.Tests
             if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
                 throw new Exception($"Test bug: failed to find the build in the cache for {buildArgs}");
 
-            var initialState = GetFiles(product.BuildPath, "*.bc", "*.o", "dotnet.wasm", "dotnet.js");
+            var initialState = GetFiles(Path.Combine(product.BuildPath, "obj"), "*.bc", "*.o");
+            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
             Dump(initialState, $"intial state from {product.BuildPath}");
 
             Run(id);
@@ -102,7 +103,72 @@ namespace Wasm.Build.Tests
                         createProject: false,
                         useCache: false);
 
-            var afterRebuildState = GetFiles(product.BuildPath, "*.bc", "*.o", "dotnet.wasm", "dotnet.js");
+            var afterRebuildState = GetFiles(product.BuildPath, "*.bc", "*.o");
+            AddFiles(afterRebuildState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
+
+            Run(rebuildId);
+
+            void Run(string buildId) => RunAndTestWasmApp(
+                                buildArgs, buildDir: _projectDir, expectedExitCode: 42,
+                                test: output => {},
+                                host: host, id: buildId, logToXUnit: false);
+
+            foreach (var initialKvp in initialState)
+            {
+                string file = initialKvp.Key;
+                FileState fileStateA = initialKvp.Value;
+
+                if (!afterRebuildState.TryGetValue(file, out FileState? fileStateB))
+                    Assert.True(false, $"Could not find file {file} in the second build");
+
+                Assert.True(fileStateA == fileStateB, $"File: {file}\nExpected: {fileStateA}\nActual:   {fileStateB}");
+            }
+        }
+
+        [Theory]
+        [BuildAndRun(host: RunHost.V8, aot: true)]
+        public void Rebuild_WithOnlyMainAssemblyChangeAOT(BuildArgs buildArgs, RunHost host, string id)
+        {
+            string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
+            bool dotnetWasmFromRuntimePack = false;
+
+            buildArgs = buildArgs with { ProjectName = projectName };
+            buildArgs = GetBuildArgsWith(buildArgs, extraProperties: "<WasmNativeStrip>false</WasmNativeStrip>");
+
+            _testOutput.WriteLine($"{Environment.NewLine}First build{Environment.NewLine}");
+            BuildProject(buildArgs,
+                        initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
+                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
+                        id: id,
+                        createProject: true);
+
+
+            if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
+                throw new Exception($"Test bug: failed to find the build in the cache for {buildArgs}");
+
+            var initialState = GetFiles(product.BuildPath, "*.bc", "*.o");
+            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
+
+            Dump(initialState, $"intial state from {product.BuildPath}");
+
+            Run(id);
+
+            File.Move(product!.LogFile, Path.ChangeExtension(product.LogFile!, ".first.binlog"));
+
+            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
+
+            string rebuildId = Path.GetRandomFileName();
+
+            // no-op Rebuild
+            BuildProject(buildArgs,
+                        () => {},
+                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
+                        id: id,
+                        createProject: false,
+                        useCache: false);
+
+            var afterRebuildState = GetFiles(product.BuildPath, "*.bc", "*.o");
+            AddFiles(afterRebuildState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
 
             Run(rebuildId);
 
@@ -124,13 +190,15 @@ namespace Wasm.Build.Tests
         }
 
         private IDictionary<string, FileState> GetFiles(string baseDir, params string[] patterns)
+            => AddFiles(new Dictionary<string, FileState>(), baseDir, patterns);
+
+        private IDictionary<string, FileState> AddFiles(IDictionary<string, FileState> table, string baseDir, params string[] patterns)
         {
+            //FIXME: static
             var options = new EnumerationOptions
             {
                 RecurseSubdirectories = true
             };
-
-            Dictionary<string, FileState> table = new();
 
             foreach (var pattern in patterns)
             {

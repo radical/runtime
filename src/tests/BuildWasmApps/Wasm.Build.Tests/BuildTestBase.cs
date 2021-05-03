@@ -451,11 +451,13 @@ namespace Wasm.Build.Tests
             return Path.Combine(dir!, "bin", config, targetFramework, "browser-wasm");
         }
 
+        protected string AppBundleDir(string buildDir, string config)
+            => Path.Combine(GetBinDir(baseDir: buildDir, config: config), "AppBundle");
+
         protected static string GetRuntimePackDir() => s_runtimePackDir;
 
         protected static string GetRuntimeNativeDir()
             => Path.Combine(GetRuntimePackDir(), "runtimes", "browser-wasm", "native");
-
 
         public static (int exitCode, string buildOutput) RunProcess(string path,
                                          ITestOutputHelper _testOutput,
@@ -599,4 +601,8 @@ namespace Wasm.Build.Tests
 
     public record BuildArgs(string ProjectName, string Config, bool AOT, string ProjectFileContents, string? ExtraBuildArgs);
     public record BuildProduct(string BuildPath, string LogFile, bool Result);
+
+    internal static class Extensions
+    {
+    }
  }
