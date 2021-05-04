@@ -77,8 +77,18 @@
     <_ExeExt Condition="$([MSBuild]::IsOSPlatform('WINDOWS'))">.exe</_ExeExt>
     <WasmUseEMSDK_PATH Condition="'$(WasmUseEMSDK_PATH)' == '' and '$(EMSDK_PATH)' != '' and Exists('$(MSBuildThisFileDirectory)WasmApp.InTree.targets')">true</WasmUseEMSDK_PATH>
 
-    <_WasmNativeBuildDependsOn>_WasmAotCompileApp;_WasmStripAOTAssemblies;_GenerateDriverGenC;_CheckEmccIsExpectedVersion</_WasmNativeBuildDependsOn>
-    <_WasmNativeBuildDependsOn>$(_WasmNativeBuildDependsOn);_PrepareForWasmBuildNative;_WasmLinkDotNet;_CompleteWasmBuildNative</_WasmNativeBuildDependsOn>
+    <_WasmNativeBuildDependsOn>
+        _WasmAotCompileApp;
+        _WasmStripAOTAssemblies;
+        _GenerateDriverGenC;
+        _CheckEmccIsExpectedVersion;
+        _PrepareForWasmBuildNative;
+        _GeneratePInvokeTable;
+        _GenerateICallTable;
+        _WasmCompileNativeFiles;
+        _WasmLinkDotNet;
+        _CompleteWasmBuildNative
+    </_WasmNativeBuildDependsOn>
   </PropertyGroup>
 
   <Import Project="$(MSBuildThisFileDirectory)EmSdkRepo.Defaults.props" Condition="'$(WasmUseEMSDK_PATH)' == 'true'" />
@@ -355,7 +365,8 @@
 
   <Target Name="_WasmBuildNative" DependsOnTargets="$(_WasmNativeBuildDependsOn)" Condition="'$(WasmBuildNative)' == 'true'" />
 
-  <Target Name="_PrepareForWasmBuildNative" DependsOnTargets="_WasmAotCompileApp;_WasmStripAOTAssemblies;_GenerateDriverGenC;_CheckEmccIsExpectedVersion" Condition="'$(WasmBuildNative)' == 'true'">
+  <Target Name="_PrepareForWasmBuildNative">
+  <!-- DependsOnTargets="_WasmAotCompileApp;_WasmStripAOTAssemblies;_GenerateDriverGenC;_CheckEmccIsExpectedVersion" Condition="'$(WasmBuildNative)' == 'true'"> -->
     <Error Condition="'$(_IsEMSDKMissing)' == 'true'"
            Text="$(_EMSDKMissingErrorMessage) Emscripten SDK is required for building native files." />
 
@@ -363,6 +374,9 @@
       <EmccFlagsFile>$([MSBuild]::NormalizePath($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'src', 'emcc-flags.txt'))</EmccFlagsFile>
       <WasmNativeStrip Condition="'$(WasmNativeStrip)' == ''">true</WasmNativeStrip>
       <WasmLinkIcalls Condition="'$(WasmLinkIcalls)' == ''">$(WasmBuildNative)</WasmLinkIcalls>
+
+      <_WasmICallTablePath>$(_WasmIntermediateOutputPath)runtime-icall-table.h</_WasmICallTablePath>
+      <_WasmPInvokeTablePath>$(_WasmIntermediateOutputPath)pinvoke-table.h</_WasmPInvokeTablePath>
     </PropertyGroup>
 
     <ReadLinesFromFile File="$(EmccFlagsFile)">
@@ -386,17 +400,7 @@
       <_WasmPInvokeModules Include="libSystem.IO.Compression.Native" />
       <_WasmPInvokeModules Include="libSystem.Globalization.Native" />
    </ItemGroup>
-   <PInvokeTableGenerator
-     Modules="@(_WasmPInvokeModules)"
-     Assemblies="@(_WasmAssembliesInternal)"
-     OutputPath="$(_WasmIntermediateOutputPath)pinvoke-table.h" />
 
-   <!-- ICall table generation -->
-   <Exec Condition="'$(WasmLinkIcalls)' == 'true'" Command='"$(MonoAotCrossCompilerPath)" --print-icall-table > "$(_WasmIntermediateOutputPath)runtime-icall-table.h"' />
-   <IcallTableGenerator Condition="'$(WasmLinkIcalls)' == 'true'"
-     RuntimeIcallTableFile="$(_WasmIntermediateOutputPath)runtime-icall-table.h"
-     Assemblies="@(_WasmAssembliesInternal)"
-     OutputPath="$(_WasmIntermediateOutputPath)icall-table.h" />
    <PropertyGroup>
      <EmccFlags Condition="'$(WasmLinkIcalls)' == 'true'">$(EmccFlags) -DLINK_ICALLS=1</EmccFlags>
      <_WasmRuntimePackIncludeDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'include'))</_WasmRuntimePackIncludeDir>
@@ -405,7 +409,11 @@
 
    <ItemGroup>
      <_WasmRuntimePackNativeLibs Include="$(MicrosoftNetCoreAppRuntimePackRidNativeDir)\*.a" />
-     <_WasmObjectsToBuild Include="$(_WasmRuntimePackSrcDir)\*.c" />
+     <_WasmObjectsToBuild Include="$(_WasmRuntimePackSrcDir)\pinvoke.c" DependentFiles="$(_WasmIntermediateOutputPath)pinvoke-table.h" />
+     <!-- FIXME: driver-gen.c also-->
+     <_WasmObjectsToBuild Include="$(_WasmRuntimePackSrcDir)\driver.c" DependentFiles="$(_WasmIntermediateOutputPath)icall-table.h" />
+
+     <_WasmObjectsToBuild Include="$(_WasmRuntimePackSrcDir)\*.c" Exclude="@(_WasmObjectsToBuild)" />
      <_WasmObjectsToBuild ObjectFile="$(_WasmIntermediateOutputPath)%(FileName).o" />
 
      <_WasmObjects Include="@(_WasmRuntimePackNativeLibs)" />
@@ -431,9 +439,10 @@
       <EmccCFlags>$(EmccFlags)</EmccCFlags>
       <EmccCFlags Condition="'$(WasmNativeDebugSymbols)' == 'true'">$(EmccCFlags) -g</EmccCFlags>
     </PropertyGroup>
+  </Target>
 
+  <Target Name="_WasmCompileNativeFiles">
     <Emcc SourceFiles="@(_BitcodeFile)" Arguments="$(EmccOptimizationFlag) $(EmccCFlags)" EnvironmentVariables="@(EmscriptenEnvVars)" />
-    <!-- <Exec Command='emcc $(EmccCFlags) $(EmccOptimizationFlag) "%(_BitcodeFile.Identity)" -c -o "%(_BitcodeFile.ObjectFile)"' EnvironmentVariables="@(EmscriptenEnvVars)" /> -->
 
     <PropertyGroup>
      <EmccCFlags>$(EmccCFlags) -DCORE_BINDINGS -DGEN_PINVOKE=1</EmccCFlags>
@@ -444,7 +453,7 @@
 
     <Message Text="Compiling native assets with emcc. This may take a while ..." Importance="High" />
     <Emcc SourceFiles="@(_WasmObjectsToBuild)" Arguments="$(EmccOptimizationFlag) $(EmccCFlags)" EnvironmentVariables="@(EmscriptenEnvVars)" />
-    </Target>
+  </Target>
 
   <Target Name="_WasmLinkDotNet"
           Inputs="@(_DotnetJSSrcFile);@(_BitcodeFile->'%(ObjectFile)');@(_WasmObjects)"
@@ -467,6 +476,26 @@
     <Exec Command="emcc &quot;@$(_EmccLinkerResponseFile)&quot;" EnvironmentVariables="@(EmscriptenEnvVars)" />
 
     <Exec Command='wasm-opt$(_ExeExt) --strip-dwarf "$(_WasmIntermediateOutputPath)dotnet.wasm" -o "$(_WasmIntermediateOutputPath)dotnet.wasm"' Condition="'$(WasmNativeStrip)' == 'true'" IgnoreStandardErrorWarningFormat="true" EnvironmentVariables="@(EmscriptenEnvVars)" />
+  </Target>
+
+  <Target Name="_GeneratePInvokeTable" Inputs="@(_WasmPInvokeModules);@(_WasmAssembliesInternal)" Outputs="$(_WasmIntermediateOutputPath)pinvoke-table.h">
+    <PInvokeTableGenerator
+      Modules="@(_WasmPInvokeModules)"
+      Assemblies="@(_WasmAssembliesInternal)"
+      OutputPath="$(_WasmIntermediateOutputPath)pinvoke-table.h" />
+  </Target>
+
+    <!-- FIXME: um this should check if anything changed in the generated runtime-icall-table.h, and only then use the task -->
+  <Target Name="_GenerateICallTable"
+          Inputs="$(_WasmIntermediateOutputPath)runtime-icall-table.h;@(_WasmAssembliesInternal)"
+          Outputs="$(_WasmIntermediateOutputPath)icall-table.h">
+
+    <!-- ICall table generation -->
+    <Exec Command='"$(MonoAotCrossCompilerPath)" --print-icall-table > "$(_WasmIntermediateOutputPath)runtime-icall-table.h"' />
+    <IcallTableGenerator
+      RuntimeIcallTableFile="$(_WasmIntermediateOutputPath)runtime-icall-table.h"
+      Assemblies="@(_WasmAssembliesInternal)"
+      OutputPath="$(_WasmIntermediateOutputPath)icall-table.h" />
   </Target>
 
   <Target Name="_CompleteWasmBuildNative">

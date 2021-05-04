@@ -31,6 +31,9 @@ namespace Microsoft.WebAssembly.Build.Tasks
 
         public string? WorkingDirectory { get; set; }
 
+        /* Ignores newness checks on the source and output files */
+        public bool AlwaysBuild { get; set; }
+
         private string? _tempPath;
 
         public override bool Execute()
@@ -53,20 +56,19 @@ namespace Microsoft.WebAssembly.Build.Tasks
                         return;
                     }
 
-                    if (IsNewer(srcFile, outFile))
+                    if (!ShouldRebuild(source, out string cause))
                     {
-                        Log.LogMessage(MessageImportance.Low, $"Compiling {srcFile} because it is newer than {outFile}, or {outFile} doesn't exist");
+                        Log.LogMessage(MessageImportance.Low, $"Skipping {srcFile} because {cause}");
+                        return;
+                    }
 
-                        string command = $"{Arguments} -c -o {outFile} {srcFile}";
-                        string script = CreateTemporaryBatchFile(command);
-                        Log.LogMessage(MessageImportance.Normal, $"Running {command}");
-                        RunProcess("/bin/sh", script, envVarsDict);
-                        Log.LogMessage(MessageImportance.Normal, $"Done compiling {srcFile}");
-                    }
-                    else
-                    {
-                        Log.LogMessage(MessageImportance.Low, $"Skipping {srcFile} because it is newer than {outFile}");
-                    }
+                    Log.LogMessage(MessageImportance.Low, $"Compiling {srcFile} because {cause}");
+
+                    string command = $"{Arguments} -c -o {outFile} {srcFile}";
+                    string script = CreateTemporaryBatchFile(command);
+                    Log.LogMessage(MessageImportance.Normal, $"Running {command}");
+                    RunProcess("/bin/sh", script, envVarsDict);
+                    Log.LogMessage(MessageImportance.Normal, $"Done compiling {srcFile}");
                 });
             }
             finally
@@ -188,21 +190,69 @@ namespace Microsoft.WebAssembly.Build.Tasks
             return file;
         }
 
-        private bool IsNewer(string fileA, string fileB)
+        private bool ShouldRebuild(ITaskItem source, out string cause)
         {
+            if (AlwaysBuild)
+            {
+                cause = $"because AlwaysBuild=true";
+                return true;
+            }
+
+            var srcFile = source.ItemSpec;
+            var outFile = source.GetMetadata("ObjectFile");
+            if (IsNewer(srcFile, outFile, out string? fileCause))
+            {
+                cause = fileCause;
+                return true;
+            }
+
+            var sb = new StringBuilder();
+            sb.Append(srcFile);
+            var dependentFiles = source.GetMetadata("DependentFiles");
+            if (!string.IsNullOrEmpty(dependentFiles))
+            {
+                string[] depFiles = dependentFiles.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var depFile in depFiles)
+                {
+                    string trimmedFile = depFile.Trim();
+                    sb.Append($", {trimmedFile}");
+                    if (IsNewer(trimmedFile, outFile, out fileCause))
+                    {
+                        cause = fileCause;
+                        return true;
+                    }
+                }
+            }
+
+            cause = $"{outFile} is newer than these files - {sb}";
+            return false;
+        }
+
+        private bool IsNewer(string fileA, string fileB, [NotNullWhen(true)] out string? cause)
+        {
+            cause = null;
+
             Log.LogMessage(MessageImportance.Low, $"IsNewer: a: {fileA} vs {fileB}");
             if (!File.Exists(fileA))
+            {
+                cause = $"{fileA} does not exist";
                 return true;
+            }
             if (!File.Exists(fileB))
+            {
+                cause = $"{fileB} does not exist";
                 return true;
+            }
 
             DateTime lastWriteTimeA= File.GetLastWriteTimeUtc(fileA);
             DateTime lastWriteTimeB= File.GetLastWriteTimeUtc(fileB);
             Log.LogMessage(MessageImportance.Low, $"\tIsNewer: a: {lastWriteTimeA} vs {lastWriteTimeB}");
+            bool result = lastWriteTimeA > lastWriteTimeB;
+            if (result)
+                cause = $"{fileA} is newer than {fileB}";
 
-            return lastWriteTimeA > lastWriteTimeB;
+            return result;
         }
-
 
         private IDictionary<string, string> GetEnvironmentVariablesDict()
         {

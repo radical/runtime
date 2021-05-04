@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -19,17 +20,27 @@ public class PInvokeTableGenerator : Task
     public ITaskItem[]? Modules { get; set; }
     [Required]
     public ITaskItem[]? Assemblies { get; set; }
+
+    [NotNull]
     [Required]
     public string? OutputPath { get; set; }
 
     public override bool Execute()
     {
-        Log.LogMessage(MessageImportance.Normal, $"Generating pinvoke table to '{OutputPath}'.");
-        GenPInvokeTable(Modules!.Select(item => item.ItemSpec).ToArray(), Assemblies!.Select(item => item.ItemSpec).ToArray());
-        return true;
+        bool didWrite = Utils.FileWriteIfContentsChanged(
+                OutputPath,
+                outputFile => GenPInvokeTable(Modules!.Select(item => item.ItemSpec).ToArray(),
+                                                outputFile,
+                                                Assemblies!.Select(item => item.ItemSpec).ToArray()));
+
+        if (didWrite)
+            Log.LogMessage(MessageImportance.Normal, $"Generating pinvoke table to '{OutputPath}'.");
+        else
+            Log.LogMessage(MessageImportance.Normal, $"Skipped generating pinvoke table to '{OutputPath}', as it is unchanged.");
+        return !Log.HasLoggedErrors;
     }
 
-    public void GenPInvokeTable(string[] pinvokeModules, string[] assemblies)
+    public void GenPInvokeTable(string[] pinvokeModules, string outputFile, string[] assemblies)
     {
         var modules = new Dictionary<string, string>();
         foreach (var module in pinvokeModules)
@@ -47,7 +58,7 @@ public class PInvokeTableGenerator : Task
                 CollectPInvokes(pinvokes, callbacks, type);
         }
 
-        using (var w = File.CreateText(OutputPath!))
+        using (var w = File.CreateText(outputFile))
         {
             EmitPInvokeTable(w, modules, pinvokes);
             EmitNativeToInterp(w, callbacks);

@@ -18,6 +18,7 @@ namespace Wasm.Build.Tests
         public RebuildTests(ITestOutputHelper output, SharedBuildPerTestClassFixture buildContext)
             : base(output, buildContext)
         {
+            _enablePerTestCleanup = true;
         }
 
         [Theory]
@@ -67,11 +68,13 @@ namespace Wasm.Build.Tests
         public void NoOpRebuild_AOT(BuildArgs buildArgs, RunHost host, string id)
         {
             string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
+            buildArgs = buildArgs with { ProjectName = projectName };
+            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
+
             var (product, initiateState) = FirstBuildAOT(buildArgs, host, id);
 
             _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
 
-            string rebuildId = Path.GetRandomFileName();
             var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
 
             new FileStateComparer(initiateState, rebuildState)
@@ -82,14 +85,16 @@ namespace Wasm.Build.Tests
         [BuildAndRun(host: RunHost.V8, aot: true)]
         public void Rebuild_WithOnlyMainAssemblyChangeAOT(BuildArgs buildArgs, RunHost host, string id)
         {
-            string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
+            string projectName = $"{buildArgs.Config}_{buildArgs.AOT}";
+            buildArgs = buildArgs with { ProjectName = projectName };
+            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
+
             var (product, initialState) = FirstBuildAOT(buildArgs, host, id);
 
             _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs timestamp changed ..{Environment.NewLine}");
 
             File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42 + " ");
 
-            string rebuildId = Path.GetRandomFileName();
             var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
 
             new FileStateComparer(initialState, rebuildState)
@@ -126,12 +131,12 @@ namespace Wasm.Build.Tests
             var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
 
             new FileStateComparer(initialState, rebuildState)
-                    .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm")
-                    .Unchanged("pinvoke.o");
+                    .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm");
+                    // .Unchanged("pinvoke.o");
 
             RunAndTestWasmApp(buildArgs, buildDir: _projectDir, expectedExitCode: 45,
                                 test: output => {},
-                                host: host, id: rebuildId, logToXUnit: false);
+                                host: host, id: id, logToXUnit: false);
         }
 
         private (BuildProduct, IDictionary<string, FileState>) FirstBuildAOT(BuildArgs buildArgs, RunHost host, string id)

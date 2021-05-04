@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,10 +16,14 @@ using Microsoft.Build.Utilities;
 
 public class IcallTableGenerator : Task
 {
+    [NotNull]
     [Required]
     public string? RuntimeIcallTableFile { get; set; }
+
     [Required]
     public ITaskItem[]? Assemblies { get; set; }
+
+    [NotNull]
     [Required]
     public string? OutputPath { get; set; }
 
@@ -27,8 +32,16 @@ public class IcallTableGenerator : Task
 
     public override bool Execute()
     {
-        Log.LogMessage(MessageImportance.Normal, $"Generating icall table to '{OutputPath}'.");
-        GenIcallTable(RuntimeIcallTableFile!, Assemblies!.Select(item => item.ItemSpec).ToArray());
+        bool didWrite = Utils.FileWriteIfContentsChanged(OutputPath, outputFile =>
+        {
+            GenIcallTable(RuntimeIcallTableFile, outputFile, Assemblies!.Select(item => item.ItemSpec).ToArray());
+        });
+
+        if (didWrite)
+            Log.LogMessage(MessageImportance.Normal, $"Generating icall table to '{OutputPath}'.");
+        else
+            Log.LogMessage(MessageImportance.Normal, $"Skipped generating icall table to '{OutputPath}', as it is unchanged.");
+
         return true;
     }
 
@@ -38,7 +51,7 @@ public class IcallTableGenerator : Task
     // The runtime icall table should be generated using
     // mono --print-icall-table
     //
-    public void GenIcallTable(string runtimeIcallTableFile, string[] assemblies)
+    public void GenIcallTable(string runtimeIcallTableFile, string outputFile, string[] assemblies)
     {
         ReadTable (runtimeIcallTableFile);
         var resolver = new PathAssemblyResolver(assemblies);
@@ -50,7 +63,7 @@ public class IcallTableGenerator : Task
                 ProcessType(type);
         }
 
-        using (var w = File.CreateText(OutputPath!))
+        using (var w = File.CreateText(outputFile))
             EmitTable (w);
     }
 

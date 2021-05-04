@@ -140,4 +140,34 @@ internal static class Utils
         if (msg != null)
             Logger?.LogError(msg);
     }
+
+    public static bool FileWriteIfContentsChanged(string outputPath, Action<string> action, bool force=false)
+    {
+        if (!File.Exists(outputPath))
+        {
+            action(outputPath);
+            return true;
+        }
+
+        var tmpPath = Path.GetTempFileName();
+        try
+        {
+            Console.WriteLine ($"Using tmp {tmpPath}");
+            action(tmpPath);
+            return Utils.FileCopyIfChanged(tmpPath, outputPath, force: force);
+        }
+        finally
+        {
+            File.Delete(tmpPath);
+        }
+    }
+
+    public static bool FileCopyIfChanged(string srcPath, string destPath, bool force=false)
+    {
+        if (!force && File.Exists(destPath) && File.ReadAllText(srcPath) == File.ReadAllText(destPath))
+            return false;
+
+        File.Copy(srcPath, destPath, true);
+        return true;
+    }
 }
