@@ -151,11 +151,11 @@ namespace Wasm.Build.Tests
 
             File.Move(product!.LogFile, Path.ChangeExtension(product.LogFile!, ".first.binlog"));
 
-            var initialState = GetFiles(Path.Combine(product.BuildPath, "obj"), "*.bc", "*.o");
-            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-            Dump(initialState, $"intial state from {product.BuildPath}");
+            var state = GetFiles(Path.Combine(product.BuildPath, "obj"), "*.bc", "*.o");
+            AddFiles(state, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
+            Dump(state, $"intial state from {product.BuildPath}");
 
-            return (product, initialState);
+            return (product, state);
         }
 
         private (BuildProduct, IDictionary<string, FileState>) RebuildAOT(BuildArgs buildArgs, RunHost host, string rebuildId)
@@ -170,11 +170,11 @@ namespace Wasm.Build.Tests
             if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
                 Assert.True(false, $"Test bug: could not get the build product in the cache");
 
-            var initialState = GetFiles(Path.Combine(product!.BuildPath, "obj"), "*.bc", "*.o");
-            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-            Dump(initialState, $"rebuild state from {product.BuildPath}");
+            var state = GetFiles(Path.Combine(product!.BuildPath, "obj"), "*.bc", "*.o");
+            AddFiles(state, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
+            Dump(state, $"rebuild state from {product.BuildPath}");
 
-            return (product, initialState);
+            return (product, state);
         }
 
         private IDictionary<string, FileState> GetFiles(string baseDir, params string[] patterns)
