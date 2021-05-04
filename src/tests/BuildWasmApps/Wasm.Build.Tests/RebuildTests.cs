@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -142,7 +143,6 @@ namespace Wasm.Build.Tests
                         id: id,
                         createProject: true);
 
-
             if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
                 throw new Exception($"Test bug: failed to find the build in the cache for {buildArgs}");
 
@@ -158,6 +158,7 @@ namespace Wasm.Build.Tests
             _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
 
             string rebuildId = Path.GetRandomFileName();
+            File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42 + " ");
 
             // no-op Rebuild
             BuildProject(buildArgs,
@@ -177,16 +178,9 @@ namespace Wasm.Build.Tests
                                 test: output => {},
                                 host: host, id: buildId, logToXUnit: false);
 
-            foreach (var initialKvp in initialState)
-            {
-                string file = initialKvp.Key;
-                FileState fileStateA = initialKvp.Value;
-
-                if (!afterRebuildState.TryGetValue(file, out FileState? fileStateB))
-                    Assert.True(false, $"Could not find file {file} in the second build");
-
-                Assert.True(fileStateA == fileStateB, $"File: {file}\nExpected: {fileStateA}\nActual:   {fileStateB}");
-            }
+            new FileStateComparer(initialState, afterRebuildState)
+                    .Changed($"{projectName}.dll.bc")
+                    .Unchanged();
         }
 
         private IDictionary<string, FileState> GetFiles(string baseDir, params string[] patterns)
@@ -226,4 +220,60 @@ namespace Wasm.Build.Tests
     }
 
     internal record FileState(DateTime LastWriteTimeUtc, long Size);
+
+    internal class FileStateComparer
+    {
+        IDictionary<string, FileState> _first, _second;
+        public FileStateComparer(IDictionary<string, FileState> first, IDictionary<string, FileState> second)
+        {
+            _first = new Dictionary<string, FileState>(first);
+            _second = new Dictionary<string, FileState>(second);
+        }
+
+        public FileStateComparer Unchanged()
+        {
+            foreach (var initialKvp in _first)
+            {
+                string file = initialKvp.Key;
+                FileState fileStateA = initialKvp.Value;
+
+                if (!_second.TryGetValue(file, out FileState? fileStateB))
+                    Assert.True(false, $"Could not find file {file} in the second build");
+
+                Assert.True(fileStateA == fileStateB, $"File: {file}\nExpected: {fileStateA}\nActual:   {fileStateB}");
+            }
+
+            return this;
+        }
+
+        public FileStateComparer Changed(params string[] filenames)
+        {
+            List<string> toRemove = new();
+            foreach (var filename in filenames)
+            {
+                KeyValuePair<string, FileState>? _firstKvp = _first.Where(kvp => Path.GetFileName(kvp.Key) == filename).FirstOrDefault();
+                Assert.NotNull(_firstKvp);
+
+                string fullPath = _firstKvp!.Value.Key;
+                FileState fileStateA = _first[fullPath];
+
+                if (!_second.TryGetValue(fullPath, out FileState? fileStateB))
+                    Assert.True(false, $"Could not find file {fullPath} in the second build");
+
+                Assert.True(fileStateA != fileStateB, $"File expected to be different: {fullPath}: {fileStateA}");
+
+                toRemove.Add(fullPath);
+            }
+
+            foreach (string fileToRemove in toRemove)
+            {
+                _first.Remove(fileToRemove);
+                _second.Remove(fileToRemove);
+            }
+
+            return this;
+        }
+
+
+    }
 }
