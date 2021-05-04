@@ -217,7 +217,7 @@ namespace Wasm.Build.Tests
                                         workingDir: bundleDir,
                                         envVars: envVars,
                                         label: testCommand,
-                                        logToXUnit: logToXUnit);
+                                        logToXUnit: /*logToXUnit*/true);
 
             File.WriteAllText(Path.Combine(testLogPath, $"xharness.log"), output);
 
@@ -483,6 +483,8 @@ namespace Wasm.Build.Tests
 
             if (workingDir == null || !Directory.Exists(workingDir))
                 throw new Exception($"Working directory {workingDir} not found");
+
+            _testOutput.WriteLine($"Working directory: {workingDir}");
 
             if (workingDir != null)
                 processStartInfo.WorkingDirectory = workingDir;

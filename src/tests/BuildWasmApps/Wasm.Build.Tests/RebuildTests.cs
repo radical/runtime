@@ -23,8 +23,7 @@ namespace Wasm.Build.Tests
         [Theory]
         [BuildAndRun(host: RunHost.V8, aot: false, parameters: false)]
         [BuildAndRun(host: RunHost.V8, aot: false, parameters: true)]
-        // [BuildAndRun(host: RunHost.V8, aot: true,  parameters: false)]
-        public void NoOpRebuild(BuildArgs buildArgs, bool nativeRelink, RunHost host, string id)
+        public void NoOpRebuild_Relinking(BuildArgs buildArgs, bool nativeRelink, RunHost host, string id)
         {
             string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
             bool dotnetWasmFromRuntimePack = !nativeRelink && !buildArgs.AOT;
@@ -65,15 +64,15 @@ namespace Wasm.Build.Tests
 
         [Theory]
         [BuildAndRun(host: RunHost.V8, aot: true)]
-        public void NoOpRebuildAOT(BuildArgs buildArgs, RunHost host, string id)
+        public void NoOpRebuild_AOT(BuildArgs buildArgs, RunHost host, string id)
         {
             string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
-            var (product, initiateState) = FirstBuildAOT(projectName, false, buildArgs, host, id);
+            var (product, initiateState) = FirstBuildAOT(buildArgs, host, id);
 
             _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
 
             string rebuildId = Path.GetRandomFileName();
-            var (_, rebuildState) = RebuildAOT(projectName, false, buildArgs, host, id);
+            var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
 
             new FileStateComparer(initiateState, rebuildState)
                 .Unchanged();
@@ -84,66 +83,62 @@ namespace Wasm.Build.Tests
         public void Rebuild_WithOnlyMainAssemblyChangeAOT(BuildArgs buildArgs, RunHost host, string id)
         {
             string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
-            bool dotnetWasmFromRuntimePack = false;
+            var (product, initialState) = FirstBuildAOT(buildArgs, host, id);
 
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, extraProperties: "<WasmNativeStrip>false</WasmNativeStrip>");
+            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs timestamp changed ..{Environment.NewLine}");
 
-            _testOutput.WriteLine($"{Environment.NewLine}First build{Environment.NewLine}");
-            BuildProject(buildArgs,
-                        initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
-                        id: id,
-                        createProject: true);
-
-            if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
-                throw new Exception($"Test bug: failed to find the build in the cache for {buildArgs}");
-
-            var initialState = GetFiles(product.BuildPath, "*.bc", "*.o");
-            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-
-            Dump(initialState, $"intial state from {product.BuildPath}");
-
-            Run(id);
-
-            File.Move(product!.LogFile, Path.ChangeExtension(product.LogFile!, ".first.binlog"));
-
-            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
-
-            string rebuildId = Path.GetRandomFileName();
             File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42 + " ");
 
-            // no-op Rebuild
-            BuildProject(buildArgs,
-                        () => {},
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
-                        id: id,
-                        createProject: false,
-                        useCache: false);
+            string rebuildId = Path.GetRandomFileName();
+            var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
 
-            var afterRebuildState = GetFiles(product.BuildPath, "*.bc", "*.o");
-            AddFiles(afterRebuildState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-
-            Run(rebuildId);
-
-            void Run(string buildId) => RunAndTestWasmApp(
-                                buildArgs, buildDir: _projectDir, expectedExitCode: 42,
-                                test: output => {},
-                                host: host, id: buildId, logToXUnit: false);
-
-            new FileStateComparer(initialState, afterRebuildState)
+            new FileStateComparer(initialState, rebuildState)
                     .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm")
                     .Unchanged();
         }
 
-        private (BuildProduct, IDictionary<string, FileState>) FirstBuildAOT(string projectName, bool dotnetWasmFromRuntimePack, BuildArgs buildArgs, RunHost host, string id)
+        [Theory]
+        [BuildAndRun(host: RunHost.V8, aot: true)]
+        public void Rebuild_WithProgramUsingNewAPI(BuildArgs buildArgs, RunHost host, string id)
         {
+            string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
             buildArgs = buildArgs with { ProjectName = projectName };
             buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
 
+            var (product, initialState) = FirstBuildAOT(buildArgs, host, id);
+
+            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs timestamp changed ..{Environment.NewLine}");
+
+            string newProgram = @"
+                using System.Text;
+                public class TestClass {
+                    public static int Main()
+                    {
+                        var sb = new StringBuilder();
+                        sb.Append(""123"");
+                        System.Console.WriteLine($""sb: {sb}"");
+                        return 42 + sb.Length;
+                    }
+                }";
+            File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), newProgram);
+
+            string rebuildId = Path.GetRandomFileName();
+            var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
+
+            new FileStateComparer(initialState, rebuildState)
+                    .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm")
+                    .Unchanged("pinvoke.o");
+
+            RunAndTestWasmApp(buildArgs, buildDir: _projectDir, expectedExitCode: 45,
+                                test: output => {},
+                                host: host, id: rebuildId, logToXUnit: false);
+        }
+
+        private (BuildProduct, IDictionary<string, FileState>) FirstBuildAOT(BuildArgs buildArgs, RunHost host, string id)
+        {
             BuildProject(buildArgs,
                         initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
+                        dotnetWasmFromRuntimePack: false,
                         id: id,
                         createProject: true);
 
@@ -163,11 +158,8 @@ namespace Wasm.Build.Tests
             return (product, initialState);
         }
 
-        private (BuildProduct, IDictionary<string, FileState>) RebuildAOT(string projectName, bool dotnetWasmFromRuntimePack, BuildArgs buildArgs, RunHost host, string rebuildId)
+        private (BuildProduct, IDictionary<string, FileState>) RebuildAOT(BuildArgs buildArgs, RunHost host, string rebuildId)
         {
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
-
             BuildProject(buildArgs,
                         () => {},
                         dotnetWasmFromRuntimePack: false,
@@ -178,13 +170,9 @@ namespace Wasm.Build.Tests
             if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
                 Assert.True(false, $"Test bug: could not get the build product in the cache");
 
-            RunAndTestWasmApp(buildArgs, buildDir: _projectDir, expectedExitCode: 42,
-                                test: output => {},
-                                host: host, id: rebuildId, logToXUnit: false);
-
             var initialState = GetFiles(Path.Combine(product!.BuildPath, "obj"), "*.bc", "*.o");
             AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-            Dump(initialState, $"intial state from {product.BuildPath}");
+            Dump(initialState, $"rebuild state from {product.BuildPath}");
 
             return (product, initialState);
         }
@@ -262,7 +250,7 @@ namespace Wasm.Build.Tests
                 if (expectChanged)
                     Assert.True(fileStateA != fileStateB, $"File expected to be different: {foundFullPath}: {fileStateA}");
                 else
-                    Assert.True(fileStateA == fileStateB, $"File: {foundFullPath}\nExpected: {fileStateA}\nActual:   {fileStateB}");
+                    Assert.True(fileStateA == fileStateB, $"File expected to be identical: {foundFullPath}\nExpected: {fileStateA}\nActual:   {fileStateB}");
 
                 toRemove.Add(foundFullPath!);
             }

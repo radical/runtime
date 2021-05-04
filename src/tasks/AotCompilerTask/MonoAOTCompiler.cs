@@ -243,8 +243,8 @@ public class MonoAOTCompiler : Microsoft.Build.Utilities.Task
         {
             _oldCache = new();
         }
-        foreach (var kvp in _oldCache.AssemblyHashes)
-            Log.LogMessage(MessageImportance.Low, $"oldcache['{kvp.Key}'] = {kvp.Value}");
+        // foreach (var kvp in _oldCache.AssemblyHashes)
+            // Log.LogMessage(MessageImportance.Low, $"oldcache['{kvp.Key}'] = {kvp.Value}");
 
         _newCache = new();
         foreach (var assemblyItem in Assemblies)
@@ -515,7 +515,7 @@ public class MonoAOTCompiler : Microsoft.Build.Utilities.Task
         Log.LogMessage(MessageImportance.Low, $"{assemblyFileName} depends on {deps}");
         string? changedAsm = parts.Skip(1).FirstOrDefault(asm => HasHashChanged(asm.Trim()));
         if (changedAsm != null)
-            cause = $"{assemblyFileName}'s dependency {changedAsm} changed";
+            cause = changedAsm == assemblyFileName ? "it changed" : $"dependency {changedAsm} changed";
 
         return changedAsm != null;
     }
