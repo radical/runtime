@@ -68,62 +68,15 @@ namespace Wasm.Build.Tests
         public void NoOpRebuildAOT(BuildArgs buildArgs, RunHost host, string id)
         {
             string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
-            bool dotnetWasmFromRuntimePack = false;
-
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, extraProperties: "<WasmNativeStrip>false</WasmNativeStrip>");
-
-            _testOutput.WriteLine($"{Environment.NewLine}First build{Environment.NewLine}");
-            BuildProject(buildArgs,
-                        initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
-                        id: id,
-                        createProject: true);
-
-
-            if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
-                throw new Exception($"Test bug: failed to find the build in the cache for {buildArgs}");
-
-            var initialState = GetFiles(Path.Combine(product.BuildPath, "obj"), "*.bc", "*.o");
-            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-            Dump(initialState, $"intial state from {product.BuildPath}");
-
-            Run(id);
-
-            File.Move(product!.LogFile, Path.ChangeExtension(product.LogFile!, ".first.binlog"));
+            var (product, initiateState) = FirstBuildAOT(projectName, false, buildArgs, host, id);
 
             _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
 
             string rebuildId = Path.GetRandomFileName();
+            var (_, rebuildState) = RebuildAOT(projectName, false, buildArgs, host, id);
 
-            // no-op Rebuild
-            BuildProject(buildArgs,
-                        () => {},
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
-                        id: id,
-                        createProject: false,
-                        useCache: false);
-
-            var afterRebuildState = GetFiles(product.BuildPath, "*.bc", "*.o");
-            AddFiles(afterRebuildState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-
-            Run(rebuildId);
-
-            void Run(string buildId) => RunAndTestWasmApp(
-                                buildArgs, buildDir: _projectDir, expectedExitCode: 42,
-                                test: output => {},
-                                host: host, id: buildId, logToXUnit: false);
-
-            foreach (var initialKvp in initialState)
-            {
-                string file = initialKvp.Key;
-                FileState fileStateA = initialKvp.Value;
-
-                if (!afterRebuildState.TryGetValue(file, out FileState? fileStateB))
-                    Assert.True(false, $"Could not find file {file} in the second build");
-
-                Assert.True(fileStateA == fileStateB, $"File: {file}\nExpected: {fileStateA}\nActual:   {fileStateB}");
-            }
+            new FileStateComparer(initiateState, rebuildState)
+                .Unchanged();
         }
 
         [Theory]
@@ -179,8 +132,61 @@ namespace Wasm.Build.Tests
                                 host: host, id: buildId, logToXUnit: false);
 
             new FileStateComparer(initialState, afterRebuildState)
-                    .Changed($"{projectName}.dll.bc")
+                    .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm")
                     .Unchanged();
+        }
+
+        private (BuildProduct, IDictionary<string, FileState>) FirstBuildAOT(string projectName, bool dotnetWasmFromRuntimePack, BuildArgs buildArgs, RunHost host, string id)
+        {
+            buildArgs = buildArgs with { ProjectName = projectName };
+            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
+
+            BuildProject(buildArgs,
+                        initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
+                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
+                        id: id,
+                        createProject: true);
+
+            RunAndTestWasmApp(buildArgs, buildDir: _projectDir, expectedExitCode: 42,
+                                test: output => {},
+                                host: host, id: id, logToXUnit: false);
+
+            if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
+                Assert.True(false, $"Test bug: could not get the build product in the cache");
+
+            File.Move(product!.LogFile, Path.ChangeExtension(product.LogFile!, ".first.binlog"));
+
+            var initialState = GetFiles(Path.Combine(product.BuildPath, "obj"), "*.bc", "*.o");
+            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
+            Dump(initialState, $"intial state from {product.BuildPath}");
+
+            return (product, initialState);
+        }
+
+        private (BuildProduct, IDictionary<string, FileState>) RebuildAOT(string projectName, bool dotnetWasmFromRuntimePack, BuildArgs buildArgs, RunHost host, string rebuildId)
+        {
+            buildArgs = buildArgs with { ProjectName = projectName };
+            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
+
+            BuildProject(buildArgs,
+                        () => {},
+                        dotnetWasmFromRuntimePack: false,
+                        id: rebuildId,
+                        createProject: false,
+                        useCache: false);
+
+            if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
+                Assert.True(false, $"Test bug: could not get the build product in the cache");
+
+            RunAndTestWasmApp(buildArgs, buildDir: _projectDir, expectedExitCode: 42,
+                                test: output => {},
+                                host: host, id: rebuildId, logToXUnit: false);
+
+            var initialState = GetFiles(Path.Combine(product!.BuildPath, "obj"), "*.bc", "*.o");
+            AddFiles(initialState, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
+            Dump(initialState, $"intial state from {product.BuildPath}");
+
+            return (product, initialState);
         }
 
         private IDictionary<string, FileState> GetFiles(string baseDir, params string[] patterns)
@@ -230,39 +236,35 @@ namespace Wasm.Build.Tests
             _second = new Dictionary<string, FileState>(second);
         }
 
-        public FileStateComparer Unchanged()
-        {
-            foreach (var initialKvp in _first)
-            {
-                string file = initialKvp.Key;
-                FileState fileStateA = initialKvp.Value;
-
-                if (!_second.TryGetValue(file, out FileState? fileStateB))
-                    Assert.True(false, $"Could not find file {file} in the second build");
-
-                Assert.True(fileStateA == fileStateB, $"File: {file}\nExpected: {fileStateA}\nActual:   {fileStateB}");
-            }
-
-            return this;
-        }
+        public FileStateComparer Unchanged(params string[] filenames)
+            => ChangedInternal(false, filenames);
 
         public FileStateComparer Changed(params string[] filenames)
+            => ChangedInternal(true, filenames);
+
+        private FileStateComparer ChangedInternal(bool expectChanged, params string[] filenames)
         {
+            if (filenames.Length == 0)
+                filenames = _first.Keys.Select(path => Path.GetFileName(path)).ToArray();
+
             List<string> toRemove = new();
             foreach (var filename in filenames)
             {
-                KeyValuePair<string, FileState>? _firstKvp = _first.Where(kvp => Path.GetFileName(kvp.Key) == filename).FirstOrDefault();
-                Assert.NotNull(_firstKvp);
+                Console.WriteLine ($"-> file: {filename}");
+                string? foundFullPath = _first.Keys!.Where(fullpath => Path.GetFileName(fullpath) == filename).FirstOrDefault();
+                Assert.True(foundFullPath != null, $"Could not find any file named {filename}");
 
-                string fullPath = _firstKvp!.Value.Key;
-                FileState fileStateA = _first[fullPath];
+                FileState fileStateA = _first[foundFullPath!];
 
-                if (!_second.TryGetValue(fullPath, out FileState? fileStateB))
-                    Assert.True(false, $"Could not find file {fullPath} in the second build");
+                if (!_second.TryGetValue(foundFullPath!, out FileState? fileStateB))
+                    Assert.True(false, $"Could not find file {foundFullPath} in the second build");
 
-                Assert.True(fileStateA != fileStateB, $"File expected to be different: {fullPath}: {fileStateA}");
+                if (expectChanged)
+                    Assert.True(fileStateA != fileStateB, $"File expected to be different: {foundFullPath}: {fileStateA}");
+                else
+                    Assert.True(fileStateA == fileStateB, $"File: {foundFullPath}\nExpected: {fileStateA}\nActual:   {fileStateB}");
 
-                toRemove.Add(fullPath);
+                toRemove.Add(foundFullPath!);
             }
 
             foreach (string fileToRemove in toRemove)
