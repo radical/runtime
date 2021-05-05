@@ -119,7 +119,7 @@ public class PInvokeTableGenerator : Task
                 Where(l => l.Module == module).
                 OrderBy(l => l.EntryPoint).
                 GroupBy(d => d.EntryPoint).
-                Select (l => "{\"" + l.Key + "\", " + l.Key + "}, // " + string.Join (", ", l.Select(c => c.Method.DeclaringType!.Module!.Assembly!.GetName ()!.Name!).Distinct()));
+                Select (l => "{\"" + l.Key + "\", " + l.Key + "}, // " + string.Join (", ", l.Select(c => c.Method.DeclaringType!.Module!.Assembly!.GetName ()!.Name!).Distinct().OrderBy(x => x)));
 
             foreach (var pinvoke in assemblies_pinvokes) {
                 w.WriteLine (pinvoke);

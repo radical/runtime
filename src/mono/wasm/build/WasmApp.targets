@@ -477,7 +477,10 @@
     <Exec Command='wasm-opt$(_ExeExt) --strip-dwarf "$(_WasmIntermediateOutputPath)dotnet.wasm" -o "$(_WasmIntermediateOutputPath)dotnet.wasm"' Condition="'$(WasmNativeStrip)' == 'true'" IgnoreStandardErrorWarningFormat="true" EnvironmentVariables="@(EmscriptenEnvVars)" />
   </Target>
 
-  <Target Name="_GeneratePInvokeTable" Inputs="@(_WasmPInvokeModules);@(_WasmAssembliesInternal)" Outputs="$(_WasmPInvokeTablePath)">
+  <Target Name="_GeneratePInvokeTable"
+          Inputs="@(_WasmAssembliesInternal)"
+          Outputs="$(_WasmPInvokeTablePath)">
+
     <PInvokeTableGenerator
       Modules="@(_WasmPInvokeModules)"
       Assemblies="@(_WasmAssembliesInternal)"

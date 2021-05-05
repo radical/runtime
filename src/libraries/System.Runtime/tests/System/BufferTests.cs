@@ -13,7 +13,7 @@ namespace System.Tests
         public static void BlockCopy()
         {
             byte[] src = new byte[] { 0x1a, 0x2b, 0x3c, 0x4d };
-            byte[] dst = new byte[] { 0x6f, 0x6f, 0x6f, 0x6f, 0x6f, 0x6f };
+            byte[] dst = new byte[] { 0x6f, 0x6f, 0x6f, 0x6f, 0x6f, 0x3 };
             Buffer.BlockCopy(src, 0, dst, 1, 4);
             Assert.Equal(new byte[] { 0x6f, 0x1a, 0x2b, 0x3c, 0x4d, 0x6f }, dst);
         }

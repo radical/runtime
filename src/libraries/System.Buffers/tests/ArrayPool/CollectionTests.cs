@@ -25,7 +25,7 @@ namespace System.Buffers.ArrayPool.Tests
                 // Check that our environment is as we expect
                 Assert.Equal(trimString, Environment.GetEnvironmentVariable(TrimSwitchName));
 
-                const int BufferCount = 8;
+                const int BufferCount = 4;
                 const int BufferSize = 1025;
 
                 // Get the pool and check our trim setting

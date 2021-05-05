@@ -10,7 +10,6 @@ using Xunit;
 using Xunit.Abstractions;
 
 #nullable enable
-
 namespace Wasm.Build.Tests
 {
     public class NativeRebuildTests : BuildTestBase
@@ -19,48 +18,6 @@ namespace Wasm.Build.Tests
             : base(output, buildContext)
         {
             _enablePerTestCleanup = true;
-        }
-
-        [Theory]
-        [BuildAndRun(host: RunHost.V8, aot: false, parameters: false)]
-        [BuildAndRun(host: RunHost.V8, aot: false, parameters: true)]
-        public void NoOpRebuild_Relinking(BuildArgs buildArgs, bool nativeRelink, RunHost host, string id)
-        {
-            string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
-            bool dotnetWasmFromRuntimePack = !nativeRelink && !buildArgs.AOT;
-
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>{(nativeRelink ? "true" : "false")}</WasmBuildNative>");
-
-            BuildProject(buildArgs,
-                        initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
-                        id: id,
-                        createProject: true);
-
-            Run();
-
-            if (!_buildContext.TryGetBuildFor(buildArgs, out BuildProduct? product))
-                Assert.True(false, $"Test bug: could not get the build product in the cache");
-
-            File.Move(product!.LogFile, Path.ChangeExtension(product.LogFile!, ".first.binlog"));
-
-            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
-
-            // no-op Rebuild
-            BuildProject(buildArgs,
-                        () => {},
-                        dotnetWasmFromRuntimePack: dotnetWasmFromRuntimePack,
-                        id: id,
-                        createProject: false,
-                        useCache: false);
-
-            Run();
-
-            void Run() => RunAndTestWasmApp(
-                                buildArgs, buildDir: _projectDir, expectedExitCode: 42,
-                                test: output => {},
-                                host: host, id: id);
         }
 
         [Theory]
@@ -77,9 +34,23 @@ namespace Wasm.Build.Tests
                 .Unchanged();
         }
 
+        //public static IEnumerable<object?[]> TrivialChangeData(bool aot)
+        //{
+            //string[] changed;
+            //if (aot)
+                //changed = new[] { "{0}.dll.bc", "{0}.dll.o", $"dotnet.js", "dotnet.wasm" };
+            //else
+                //changed = new[] { "dotnet.js", "dotnet.wasm" };
+
+            //return ConfigWithAOTData(aot)
+                    //.Multiply(new object?[] { changed })
+                    //.WithRunHosts(RunHost.V8)
+                    //.UnwrapItemsAsArrays();
+        //}
+
         [Theory]
-        [BuildAndRun(host: RunHost.V8, aot: true)]
-        [BuildAndRun(host: RunHost.V8, aot: false)]
+        [MemberData(nameof(TrivialChangeData), parameters: true)]
+        [MemberData(nameof(TrivialChangeData), parameters: false)]
         public void Rebuild_WithProgramCS_TrivialChange(BuildArgs buildArgs, RunHost host, string id)
         {
             (_, var initialState, buildArgs) = FirstBuildNative(buildArgs, host, id, "trivial");
@@ -88,8 +59,10 @@ namespace Wasm.Build.Tests
             File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42 + " ");
             var (_, rebuildState) = RebuildNative(buildArgs, host, id);
 
+            changed = changed.Select(s => string.Format(s, buildArgs.ProjectName)).ToArray();
+
             new FileStateComparer(initialState, rebuildState)
-                    .Changed($"{buildArgs.ProjectName}.dll.bc", $"{buildArgs.ProjectName}.dll.o", $"dotnet.js", "dotnet.wasm")
+                    //.Changed(changed)
                     .Unchanged();
         }
 
