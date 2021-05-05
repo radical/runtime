@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 public class Test
 {
@@ -10,9 +11,10 @@ public class Test
     {
         await Task.Delay(1);
         Console.WriteLine("Hello World - jsut !");
-        for (int i = 0; i < args.Length; i++) {
-            Console.WriteLine($"args[{i}] = {args[i]}");
-        }
+        Console.WriteLine ($"from pinvoke: {print_line("Foo Bar")}");
         return args.Length;
     }
+
+    [DllImport("NativeLib")]
+    private static extern int print_line(string str);
 }

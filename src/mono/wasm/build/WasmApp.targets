@@ -441,7 +441,14 @@
   </Target>
 
   <Target Name="_WasmCompileNativeFiles">
+    <ItemGroup>
+      <NativeLib ObjectFile="%(FileName).wasm" />
+
+      <WasmNativeSource ObjectFile="$(_WasmIntermediateOutputPath)%(FileName).o" />
+    </ItemGroup>
     <Emcc SourceFiles="@(_BitcodeFile)" Arguments="$(EmccOptimizationFlag) $(EmccCFlags)" EnvironmentVariables="@(EmscriptenEnvVars)" />
+    <Emcc SourceFiles="@(WasmNativeSource)" Arguments="$(EmccOptimizationFlag) -s WASM=1 -s EXPORTED_FUNCTIONS='[&quot;print_line&quot;]' $(EmccCFlags)" EnvironmentVariables="@(EmscriptenEnvVars)" />
+    <!--<Emcc SourceFiles="@(NativeLib)" Arguments="$(EmccOptimizationFlag) -s WASM=1 $(EmccCFlags)" EnvironmentVariables="@(EmscriptenEnvVars)" />-->
 
     <PropertyGroup>
      <EmccCFlags>$(EmccCFlags) -DCORE_BINDINGS -DGEN_PINVOKE=1</EmccCFlags>
@@ -463,6 +470,7 @@
       <_EmccLinkerArguments Include="--js-library &quot;%(_DotnetJSSrcFile.Identity)&quot;" />
       <_EmccLinkerArguments Include="&quot;%(_BitcodeFile.ObjectFile)&quot;" />
       <_EmccLinkerArguments Include="&quot;%(_WasmObjects.Identity)&quot;" />
+      <_EmccLinkerArguments Include="%(WasmNativeSource.ObjectFile)" />
       <_EmccLinkerArguments Include="-o &quot;$(_WasmIntermediateOutputPath)dotnet.js&quot;" />
     </ItemGroup>
 

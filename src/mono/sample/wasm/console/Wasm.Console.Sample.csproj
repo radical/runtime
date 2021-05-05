@@ -9,5 +9,11 @@
     <_SampleProject>Wasm.Console.Sample.csproj</_SampleProject>
   </PropertyGroup>
 
+  <ItemGroup>
+    <NativeLib Include="NativeLib.o" />
+
+    <WasmNativeSource Include="NativeLib.c" />
+  </ItemGroup>
+
   <Target Name="RunSample" DependsOnTargets="RunSampleWithV8" />
 </Project>
