@@ -13,9 +13,9 @@ using Xunit.Abstractions;
 
 namespace Wasm.Build.Tests
 {
-    public class RebuildTests : BuildTestBase
+    public class NativeRebuildTests : BuildTestBase
     {
-        public RebuildTests(ITestOutputHelper output, SharedBuildPerTestClassFixture buildContext)
+        public NativeRebuildTests(ITestOutputHelper output, SharedBuildPerTestClassFixture buildContext)
             : base(output, buildContext)
         {
             _enablePerTestCleanup = true;
@@ -65,54 +65,56 @@ namespace Wasm.Build.Tests
 
         [Theory]
         [BuildAndRun(host: RunHost.V8, aot: true)]
-        public void NoOpRebuild_AOT(BuildArgs buildArgs, RunHost host, string id)
+        [BuildAndRun(host: RunHost.V8, aot: false)]
+        public void NoOpRebuild(BuildArgs buildArgs, RunHost host, string id)
         {
-            string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
-
-            var (product, initiateState) = FirstBuildAOT(buildArgs, host, id);
+            (_, var initiateState, buildArgs) = FirstBuildNative(buildArgs, host, id, "noop");
 
             _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with no changes ..{Environment.NewLine}");
 
-            var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
-
+            var (_, rebuildState) = RebuildNative(buildArgs, host, id);
             new FileStateComparer(initiateState, rebuildState)
                 .Unchanged();
         }
 
         [Theory]
         [BuildAndRun(host: RunHost.V8, aot: true)]
-        public void Rebuild_WithOnlyMainAssemblyChangeAOT(BuildArgs buildArgs, RunHost host, string id)
+        [BuildAndRun(host: RunHost.V8, aot: false)]
+        public void Rebuild_WithProgramCS_TrivialChange(BuildArgs buildArgs, RunHost host, string id)
         {
-            string projectName = $"{buildArgs.Config}_{buildArgs.AOT}";
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
+            (_, var initialState, buildArgs) = FirstBuildNative(buildArgs, host, id, "trivial");
 
-            var (product, initialState) = FirstBuildAOT(buildArgs, host, id);
-
-            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs timestamp changed ..{Environment.NewLine}");
-
+            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs trivial change ..{Environment.NewLine}");
             File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42 + " ");
-
-            var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
+            var (_, rebuildState) = RebuildNative(buildArgs, host, id);
 
             new FileStateComparer(initialState, rebuildState)
-                    .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm")
+                    .Changed($"{buildArgs.ProjectName}.dll.bc", $"{buildArgs.ProjectName}.dll.o", $"dotnet.js", "dotnet.wasm")
                     .Unchanged();
         }
 
         [Theory]
         [BuildAndRun(host: RunHost.V8, aot: true)]
+        public void Rebuild_WithProgramCS_TimestampChange(BuildArgs buildArgs, RunHost host, string id)
+        {
+            (_, var initialState, buildArgs) = FirstBuildNative(buildArgs, host, id, "timestamp");
+
+            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs trivial change ..{Environment.NewLine}");
+            File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42);
+            var (_, rebuildState) = RebuildNative(buildArgs, host, id);
+
+            new FileStateComparer(initialState, rebuildState)
+                    .Unchanged();
+        }
+
+        [Theory]
+        [BuildAndRun(host: RunHost.V8, aot: true)]
+        [BuildAndRun(host: RunHost.V8, aot: false)]
         public void Rebuild_WithProgramUsingNewAPI(BuildArgs buildArgs, RunHost host, string id)
         {
-            string projectName = $"rebuild_{buildArgs.Config}_{buildArgs.AOT}";
-            buildArgs = buildArgs with { ProjectName = projectName };
-            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>false</WasmBuildNative>");
+            (_, var initialState, buildArgs) = FirstBuildNative(buildArgs, host, id, "use_new_api");
 
-            var (product, initialState) = FirstBuildAOT(buildArgs, host, id);
-
-            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs timestamp changed ..{Environment.NewLine}");
+            _testOutput.WriteLine($"{Environment.NewLine}Rebuilding with only Program.cs changed ..{Environment.NewLine}");
 
             string newProgram = @"
                 using System.Text;
@@ -128,19 +130,24 @@ namespace Wasm.Build.Tests
             File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), newProgram);
 
             string rebuildId = Path.GetRandomFileName();
-            var (_, rebuildState) = RebuildAOT(buildArgs, host, id);
+            var (_, rebuildState) = RebuildNative(buildArgs, host, id);
 
             new FileStateComparer(initialState, rebuildState)
-                    .Changed($"{projectName}.dll.bc", $"{projectName}.dll.o", $"dotnet.js", "dotnet.wasm");
-                    // .Unchanged("pinvoke.o");
+                    .Changed($"{buildArgs.ProjectName}.dll.bc", $"{buildArgs.ProjectName}.dll.o", $"dotnet.js", "dotnet.wasm");
 
             RunAndTestWasmApp(buildArgs, buildDir: _projectDir, expectedExitCode: 45,
                                 test: output => {},
                                 host: host, id: id, logToXUnit: false);
         }
 
-        private (BuildProduct, IDictionary<string, FileState>) FirstBuildAOT(BuildArgs buildArgs, RunHost host, string id)
+        private (BuildProduct, IDictionary<string, FileState>, BuildArgs) FirstBuildNative(BuildArgs buildArgs, RunHost host, string id, string namePrefix="")
         {
+            bool relinking = !buildArgs.AOT;
+
+            string projectName = $"{namePrefix}_{buildArgs.Config}_{buildArgs.AOT}";
+            buildArgs = buildArgs with { ProjectName = projectName };
+            buildArgs = GetBuildArgsWith(buildArgs, $"<WasmBuildNative>{relinking}</WasmBuildNative>");
+
             BuildProject(buildArgs,
                         initProject: () => File.WriteAllText(Path.Combine(_projectDir!, "Program.cs"), s_mainReturns42),
                         dotnetWasmFromRuntimePack: false,
@@ -158,12 +165,12 @@ namespace Wasm.Build.Tests
 
             var state = GetFiles(Path.Combine(product.BuildPath, "obj"), "*.bc", "*.o");
             AddFiles(state, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-            Dump(state, $"intial state from {product.BuildPath}");
+            //Dump(state, $"intial state from {product.BuildPath}");
 
-            return (product, state);
+            return (product, state, buildArgs);
         }
 
-        private (BuildProduct, IDictionary<string, FileState>) RebuildAOT(BuildArgs buildArgs, RunHost host, string rebuildId)
+        private (BuildProduct, IDictionary<string, FileState>) RebuildNative(BuildArgs buildArgs, RunHost host, string rebuildId)
         {
             BuildProject(buildArgs,
                         () => {},
@@ -177,7 +184,7 @@ namespace Wasm.Build.Tests
 
             var state = GetFiles(Path.Combine(product!.BuildPath, "obj"), "*.bc", "*.o");
             AddFiles(state, AppBundleDir(product.BuildPath, buildArgs.Config), "dotnet.wasm", "dotnet.js");
-            Dump(state, $"rebuild state from {product.BuildPath}");
+            //Dump(state, $"rebuild state from {product.BuildPath}");
 
             return (product, state);
         }
