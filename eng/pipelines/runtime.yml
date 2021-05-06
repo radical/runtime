@@ -166,35 +166,35 @@ jobs:
 # Only when CoreCLR is changed, and only in the 'main' branch (no release branches;
 # both CI and PR builds).
 #
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/format-job.yml
-    platforms:
-    - Linux_x64
-    - windows_x64
-    jobParameters:
-      condition: >-
-        and(
-          or(
-            eq(variables['Build.SourceBranchName'], 'main'),
-            eq(variables['System.PullRequest.TargetBranch'], 'main')),
-          or(
-            eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
-            eq(variables['isFullMatrix'], true)))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/format-job.yml
+    #platforms:
+    #- Linux_x64
+    #- windows_x64
+    #jobParameters:
+      #condition: >-
+        #and(
+          #or(
+            #eq(variables['Build.SourceBranchName'], 'main'),
+            #eq(variables['System.PullRequest.TargetBranch'], 'main')),
+          #or(
+            #eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
+            #eq(variables['isFullMatrix'], true)))
 
 # Build and test clr tools
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
-    buildConfig: checked
-    platforms:
-    - Linux_x64
-    jobParameters:
-      testGroup: clrTools
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/coreclr/templates/build-job.yml
+    #buildConfig: checked
+    #platforms:
+    #- Linux_x64
+    #jobParameters:
+      #testGroup: clrTools
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_coreclr.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
 # Build Mono AOT offset headers once, for consumption elsewhere
 # Only when mono changed
@@ -204,10 +204,10 @@ jobs:
     jobTemplate: /eng/pipelines/mono/templates/generate-offsets.yml
     buildConfig: release
     platforms:
-    - Android_x64
+    #- Android_x64
     - Browser_wasm
-    - tvOS_arm64
-    - iOS_arm64
+    #- tvOS_arm64
+    #- iOS_arm64
     jobParameters:
       condition: >-
         or(
@@ -494,58 +494,58 @@ jobs:
 # Build Mono debug
 # Only when libraries or mono changed
 #
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/mono/templates/build-job.yml
-    runtimeFlavor: mono
-    buildConfig: debug
-    platforms:
-    - OSX_x64
-    - OSX_arm64
-    - Linux_x64
-    - Linux_arm64
-    # - Linux_musl_arm64
-    - windows_x64
-    - windows_x86
-    # - windows_arm
-    # - windows_arm64
-    jobParameters:
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/mono/templates/build-job.yml
+    #runtimeFlavor: mono
+    #buildConfig: debug
+    #platforms:
+    #- OSX_x64
+    #- OSX_arm64
+    #- Linux_x64
+    #- Linux_arm64
+    ## - Linux_musl_arm64
+    #- windows_x64
+    #- windows_x86
+    ## - windows_arm
+    ## - windows_arm64
+    #jobParameters:
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
 #
 # Build Mono release AOT cross-compilers
 # Only when mono changed
 #
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/mono/templates/build-job.yml
-    runtimeFlavor: mono
-    buildConfig: release
-    platforms:
-    - Linux_x64
-    # - Linux_arm64
-    # - Linux_musl_arm64
-    - Windows_x64
-    # - windows_x86
-    # - windows_arm
-    # - windows_arm64
-    jobParameters:
-      runtimeVariant: crossaot
-      dependsOn:
-      - mono_android_offsets
-      - mono_browser_offsets
-      monoCrossAOTTargetOS:
-      - Android
-      - Browser
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_installer.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/mono/templates/build-job.yml
+    #runtimeFlavor: mono
+    #buildConfig: release
+    #platforms:
+    #- Linux_x64
+    ## - Linux_arm64
+    ## - Linux_musl_arm64
+    #- Windows_x64
+    ## - windows_x86
+    ## - windows_arm
+    ## - windows_arm64
+    #jobParameters:
+      #runtimeVariant: crossaot
+      #dependsOn:
+      #- mono_android_offsets
+      #- mono_browser_offsets
+      #monoCrossAOTTargetOS:
+      #- Android
+      #- Browser
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_installer.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
 - template: /eng/pipelines/common/platform-matrix.yml
   parameters:
@@ -557,15 +557,15 @@ jobs:
     jobParameters:
       runtimeVariant: crossaot
       dependsOn:
-      - mono_android_offsets
+      #- mono_android_offsets
       - mono_browser_offsets
-      - mono_tvos_offsets
-      - mono_ios_offsets
+      #- mono_tvos_offsets
+      #- mono_ios_offsets
       monoCrossAOTTargetOS:
-      - Android
+      #- Android
       - Browser
-      - tvOS
-      - iOS
+      #- tvOS
+      #- iOS
       condition: >-
         or(
           eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
@@ -576,44 +576,44 @@ jobs:
 # Build Mono release
 # Only when libraries or mono changed
 #
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/mono/templates/build-job.yml
-    runtimeFlavor: mono
-    buildConfig: release
-    platforms:
-    - Linux_x64
-    # - Linux_musl_arm64
-    - windows_x64
-    - windows_x86
-    # - windows_arm
-    # - windows_arm64
-    jobParameters:
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/mono/templates/build-job.yml
+    #runtimeFlavor: mono
+    #buildConfig: release
+    #platforms:
+    #- Linux_x64
+    ## - Linux_musl_arm64
+    #- windows_x64
+    #- windows_x86
+    ## - windows_arm
+    ## - windows_arm64
+    #jobParameters:
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
 #
 # Build Mono release
 # Only when libraries, mono, or the runtime tests changed
 # Currently only these architectures are needed for the runtime tests.
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/mono/templates/build-job.yml
-    runtimeFlavor: mono
-    buildConfig: release
-    platforms:
-    - OSX_x64
-    - Linux_arm64
-    jobParameters:
-      condition: >-
-        or(
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_runtimetests.containsChange'], true),
-          eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
-          eq(variables['isFullMatrix'], true))
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/mono/templates/build-job.yml
+    #runtimeFlavor: mono
+    #buildConfig: release
+    #platforms:
+    #- OSX_x64
+    #- Linux_arm64
+    #jobParameters:
+      #condition: >-
+        #or(
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_libraries.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_runtimetests.containsChange'], true),
+          #eq(dependencies.evaluate_paths.outputs['SetPathVars_mono.containsChange'], true),
+          #eq(variables['isFullMatrix'], true))
 
 #
 # Build Mono release with LLVM AOT
@@ -641,19 +641,19 @@ jobs:
 # The reason for that is because Corelib and Installer needs it and
 # These are part of the test matrix for Libraries changes.
 #
-- template: /eng/pipelines/common/platform-matrix.yml
-  parameters:
-    jobTemplate: /eng/pipelines/libraries/build-job.yml
-    buildConfig: Release
-    platforms:
-    - Linux_arm
-    - Linux_musl_arm
-    - Linux_musl_arm64
-    - windows_arm
-    - windows_arm64
-    - windows_x86
-    jobParameters:
-      liveRuntimeBuildConfig: release
+#- template: /eng/pipelines/common/platform-matrix.yml
+  #parameters:
+    #jobTemplate: /eng/pipelines/libraries/build-job.yml
+    #buildConfig: Release
+    #platforms:
+    #- Linux_arm
+    #- Linux_musl_arm
+    #- Linux_musl_arm64
+    #- windows_arm
+    #- windows_arm64
+    #- windows_x86
+    #jobParameters:
+      #liveRuntimeBuildConfig: release
 
 #- template: /eng/pipelines/common/platform-matrix.yml
   #parameters:
