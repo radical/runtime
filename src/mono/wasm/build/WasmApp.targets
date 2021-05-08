@@ -360,23 +360,24 @@
     </PropertyGroup>
 
     <ReadLinesFromFile File="$(EmccFlagsFile)">
-        <Output TaskParameter="Lines" PropertyName="_DefaultEmccFlags" />
+      <Output TaskParameter="Lines" PropertyName="_DefaultEmccFlags" />
     </ReadLinesFromFile>
 
-    <PropertyGroup>
-      <EmccFlags>$(_DefaultEmccFlags) $(EmccFlags)</EmccFlags>
-      <EmccFlags Condition="'$(_WasmDevel)' == 'true'">-O0 $(EmccFlags)</EmccFlags>
-      <EmccFlags>$(EmccFlags) -s DISABLE_EXCEPTION_CATCHING=0</EmccFlags>
-      <EmccFlags Condition="'$(WasmNativeStrip)' == 'false'">$(EmccFlags) -g</EmccFlags>
-      <EmccFlags Condition="'$(RunAOTCompilation)' == 'true'">$(EmccFlags) -DENABLE_AOT=1 -DDRIVER_GEN=1</EmccFlags>
-      <EmccFlags Condition="'$(InvariantGlobalization)' == 'true'">$(EmccFlags) -DINVARIANT_GLOBALIZATION=1</EmccFlags>
-    </PropertyGroup>
-
     <ItemGroup>
+      <_EmccFlagsItem Include="-O0"                               Condition="'$(_WasmDevel)' == 'true'" />
+      <_EmccFlagsItem Include="$(_DefaultEmccFlags)" />
+      <_EmccFlagsItem Include="$(EmccFlags)" />
+      <_EmccFlagsItem Include="-s DISABLE_EXCEPTION_CATCHING=0" />
+      <_EmccFlagsItem Include="-g"                                Condition="'$(WasmNativeStrip)' == 'false'" />
+      <_EmccFlagsItem Include="-DENABLE_AOT=1 -DDRIVER_GEN=1"     Condition="'$(RunAOTCompilation)' == 'true'" />
+      <_EmccFlagsItem Include="-DINVARIANT_GLOBALIZATION=1"       Condition="'$(InvariantGlobalization)' == 'true'" />
+      <_EmccFlagsItem Include="-DLINK_ICALLS=1"                   Condition="'$(WasmLinkIcalls)' == 'true'" />
+
       <_WasmPInvokeModules Include="libSystem.Native" />
       <_WasmPInvokeModules Include="libSystem.IO.Compression.Native" />
       <_WasmPInvokeModules Include="libSystem.Globalization.Native" />
     </ItemGroup>
+
     <PInvokeTableGenerator
       Modules="@(_WasmPInvokeModules)"
       Assemblies="@(_WasmAssembliesInternal)"
@@ -389,9 +390,11 @@
       Assemblies="@(_WasmAssembliesInternal)"
       OutputPath="$(_WasmIntermediateOutputPath)icall-table.h" />
     <PropertyGroup>
-      <EmccFlags Condition="'$(WasmLinkIcalls)' == 'true'">$(EmccFlags) -DLINK_ICALLS=1</EmccFlags>
       <_WasmRuntimePackIncludeDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'include'))</_WasmRuntimePackIncludeDir>
       <_WasmRuntimePackSrcDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'src'))</_WasmRuntimePackSrcDir>
+
+      <_EmccLinkerResponseFile>$(_WasmIntermediateOutputPath)emcc-link.rsp</_EmccLinkerResponseFile>
+      <_EmccNativeObjectsResponseFile>$(_WasmIntermediateOutputPath)emcc-native-objects.rsp</_EmccNativeObjectsResponseFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -409,36 +412,34 @@
     </ItemGroup>
 
     <Error Condition="'$(RunAOTCompilation)' == 'true' and @(_BitcodeFile->Count()) != @(_AOTAssemblies->Count())"
-          Text="Bug: Number of aot assemblies doesn't match the number of generated bitcode files. BitcodeFiles: @(_BitcodeFile->Count()) vs Assemblies: @(_AOTAssemblies->Count())" />
+           Text="Bug: Number of aot assemblies doesn't match the number of generated bitcode files. BitcodeFiles: @(_BitcodeFile->Count()) vs Assemblies: @(_AOTAssemblies->Count())" />
 
     <ItemGroup>
       <_EmccIncludePaths Include="$(_WasmIntermediateOutputPath.TrimEnd('\/'))" />
       <_EmccIncludePaths Include="$(_WasmRuntimePackIncludeDir)mono-2.0" />
       <_EmccIncludePaths Include="$(_WasmRuntimePackIncludeDir)wasm" />
+
+      <_EmccCFlagsItem Include="@(_EmccFlagsItem)" />
+      <_EmccCFlagsItem Include="-DCORE_BINDINGS" />
+      <_EmccCFlagsItem Include="-DGEN_PINVOKE=1" />
+      <_EmccCFlagsItem Include="&quot;-I%(_EmccIncludePaths.Identity)&quot;" />
+      <_EmccCFlagsItem Include="-g" Condition="'$(WasmNativeDebugSymbols)' == 'true'" />
+
+      <_EmccLDFlagsItem Include="@(_EmccCFlagsItem)" />
+      <_EmccLDFlagsItem Include="-s TOTAL_MEMORY=536870912" />
     </ItemGroup>
 
-    <PropertyGroup>
-      <EmccCFlags>$(EmccFlags) -DCORE_BINDINGS -DGEN_PINVOKE=1</EmccCFlags>
-      <EmccCFlags>$(EmccCFlags) @(_EmccIncludePaths -> '&quot;-I%(Identity)&quot;', ' ')</EmccCFlags>
-      <EmccCFlags Condition="'$(WasmNativeDebugSymbols)' == 'true'">$(EmccCFlags) -g</EmccCFlags>
-
-      <EmccLDFlags>$(EmccFlags) -s TOTAL_MEMORY=536870912</EmccLDFlags>
-    </PropertyGroup>
-
     <Message Text="Compiling native assets with emcc. This may take a while ..." Importance="High" />
-    <Exec Command='emcc $(EmccCFlags) "%(_WasmObjectsToBuild.Identity)" -c -o "%(_WasmObjectsToBuild.OutputPath)"' EnvironmentVariables="@(EmscriptenEnvVars)" />
+    <WriteLinesToFile Lines="@(_EmccCFlagsItem)" File="$(_EmccNativeObjectsResponseFile)" Overwrite="true" />
+    <Exec Command='emcc @$(_EmccNativeObjectsResponseFile) "%(_WasmObjectsToBuild.Identity)" -c -o "%(_WasmObjectsToBuild.OutputPath)"' EnvironmentVariables="@(EmscriptenEnvVars)" />
 
     <ItemGroup>
-      <_EmccLinkerArguments Include="$(EmccLDFlags)" />
+      <_EmccLinkerArguments Include="@(_EmccLDFlagsItem)" />
       <_EmccLinkerArguments Include="--js-library &quot;%(_DotnetJSSrcFile.Identity)&quot;" />
       <_EmccLinkerArguments Include="&quot;%(_BitcodeFile.Identity)&quot;" />
       <_EmccLinkerArguments Include="&quot;%(_WasmObjects.Identity)&quot;" />
       <_EmccLinkerArguments Include="-o &quot;$(_WasmIntermediateOutputPath)dotnet.js&quot;" />
     </ItemGroup>
-
-    <PropertyGroup>
-      <_EmccLinkerResponseFile>$(_WasmIntermediateOutputPath)emcc-link.rsp</_EmccLinkerResponseFile>
-    </PropertyGroup>
 
     <WriteLinesToFile Lines="@(_EmccLinkerArguments)" File="$(_EmccLinkerResponseFile)" Overwrite="true" />
     <Message Text="Running emcc with @(_EmccLinkerArguments->'%(Identity)', ' ')" Importance="Low" />
@@ -454,7 +455,6 @@
 
   <Target Name="_GenerateDriverGenC" Condition="'$(RunAOTCompilation)' != 'true' and '$(WasmProfilers)' != ''">
     <PropertyGroup>
-      <EmccFlags>$(EmccFlags) -DDRIVER_GEN=1</EmccFlags>
       <InitAotProfilerCmd>
 void mono_profiler_init_aot (const char *desc)%3B
 EMSCRIPTEN_KEEPALIVE void mono_wasm_load_profiler_aot (const char *desc) { mono_profiler_init_aot (desc)%3B }
@@ -467,7 +467,8 @@ EMSCRIPTEN_KEEPALIVE void mono_wasm_load_profiler_aot (const char *desc) { mono_
     <WriteLinesToFile File="$(_DriverGenCPath)" Overwrite="true" Lines="$(InitAotProfilerCmd)" />
 
     <ItemGroup>
-        <FileWrites Include="$(_DriverGenCPath)" />
+      <_EmccFlagsItem Include="-DDRIVER_GEN=1" />
+      <FileWrites Include="$(_DriverGenCPath)" />
     </ItemGroup>
   </Target>
 
