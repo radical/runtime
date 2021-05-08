@@ -372,62 +372,62 @@
       <EmccFlags Condition="'$(InvariantGlobalization)' == 'true'">$(EmccFlags) -DINVARIANT_GLOBALIZATION=1</EmccFlags>
     </PropertyGroup>
 
-   <ItemGroup>
+    <ItemGroup>
       <_WasmPInvokeModules Include="libSystem.Native" />
       <_WasmPInvokeModules Include="libSystem.IO.Compression.Native" />
       <_WasmPInvokeModules Include="libSystem.Globalization.Native" />
-   </ItemGroup>
-   <PInvokeTableGenerator
-     Modules="@(_WasmPInvokeModules)"
-     Assemblies="@(_WasmAssembliesInternal)"
-     OutputPath="$(_WasmIntermediateOutputPath)pinvoke-table.h" />
+    </ItemGroup>
+    <PInvokeTableGenerator
+      Modules="@(_WasmPInvokeModules)"
+      Assemblies="@(_WasmAssembliesInternal)"
+      OutputPath="$(_WasmIntermediateOutputPath)pinvoke-table.h" />
 
-   <!-- ICall table generation -->
-   <Exec Condition="'$(WasmLinkIcalls)' == 'true'" Command='"$(MonoAotCrossCompilerPath)" --print-icall-table > "$(_WasmIntermediateOutputPath)runtime-icall-table.h"' />
-   <IcallTableGenerator Condition="'$(WasmLinkIcalls)' == 'true'"
-     RuntimeIcallTableFile="$(_WasmIntermediateOutputPath)runtime-icall-table.h"
-     Assemblies="@(_WasmAssembliesInternal)"
-     OutputPath="$(_WasmIntermediateOutputPath)icall-table.h" />
-   <PropertyGroup>
-     <EmccFlags Condition="'$(WasmLinkIcalls)' == 'true'">$(EmccFlags) -DLINK_ICALLS=1</EmccFlags>
-     <_WasmRuntimePackIncludeDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'include'))</_WasmRuntimePackIncludeDir>
-     <_WasmRuntimePackSrcDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'src'))</_WasmRuntimePackSrcDir>
-   </PropertyGroup>
+    <!-- ICall table generation -->
+    <Exec Condition="'$(WasmLinkIcalls)' == 'true'" Command='"$(MonoAotCrossCompilerPath)" --print-icall-table > "$(_WasmIntermediateOutputPath)runtime-icall-table.h"' />
+    <IcallTableGenerator Condition="'$(WasmLinkIcalls)' == 'true'"
+      RuntimeIcallTableFile="$(_WasmIntermediateOutputPath)runtime-icall-table.h"
+      Assemblies="@(_WasmAssembliesInternal)"
+      OutputPath="$(_WasmIntermediateOutputPath)icall-table.h" />
+    <PropertyGroup>
+      <EmccFlags Condition="'$(WasmLinkIcalls)' == 'true'">$(EmccFlags) -DLINK_ICALLS=1</EmccFlags>
+      <_WasmRuntimePackIncludeDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'include'))</_WasmRuntimePackIncludeDir>
+      <_WasmRuntimePackSrcDir>$([MSBuild]::NormalizeDirectory($(MicrosoftNetCoreAppRuntimePackRidNativeDir), 'src'))</_WasmRuntimePackSrcDir>
+    </PropertyGroup>
 
-   <ItemGroup>
-     <_WasmRuntimePackNativeLibs Include="$(MicrosoftNetCoreAppRuntimePackRidNativeDir)\*.a" />
-     <_WasmObjectsToBuild Include="$(_WasmRuntimePackSrcDir)\*.c" />
-     <_WasmObjectsToBuild OutputPath="$(_WasmIntermediateOutputPath)%(FileName).o" />
+    <ItemGroup>
+      <_WasmRuntimePackNativeLibs Include="$(MicrosoftNetCoreAppRuntimePackRidNativeDir)\*.a" />
+      <_WasmObjectsToBuild Include="$(_WasmRuntimePackSrcDir)\*.c" />
+      <_WasmObjectsToBuild OutputPath="$(_WasmIntermediateOutputPath)%(FileName).o" />
 
-     <_WasmObjects Include="@(_WasmRuntimePackNativeLibs)" />
-     <_WasmObjects Include="@(_WasmObjectsToBuild->'%(OutputPath)')" />
+      <_WasmObjects Include="@(_WasmRuntimePackNativeLibs)" />
+      <_WasmObjects Include="@(_WasmObjectsToBuild->'%(OutputPath)')" />
 
-     <_DotnetJSSrcFile Include="$(_WasmRuntimePackSrcDir)\*.js" />
+      <_DotnetJSSrcFile Include="$(_WasmRuntimePackSrcDir)\*.js" />
 
-     <_AOTAssemblies Include="@(_WasmAssembliesInternal)" Condition="'%(_WasmAssembliesInternal._InternalForceInterpret)' != 'true'" />
-     <_BitcodeFile Include="%(_WasmAssembliesInternal.LlvmBitcodeFile)" />
-   </ItemGroup>
+      <_AOTAssemblies Include="@(_WasmAssembliesInternal)" Condition="'%(_WasmAssembliesInternal._InternalForceInterpret)' != 'true'" />
+      <_BitcodeFile Include="%(_WasmAssembliesInternal.LlvmBitcodeFile)" />
+    </ItemGroup>
 
-   <Error Condition="'$(RunAOTCompilation)' == 'true' and @(_BitcodeFile->Count()) != @(_AOTAssemblies->Count())"
+    <Error Condition="'$(RunAOTCompilation)' == 'true' and @(_BitcodeFile->Count()) != @(_AOTAssemblies->Count())"
           Text="Bug: Number of aot assemblies doesn't match the number of generated bitcode files. BitcodeFiles: @(_BitcodeFile->Count()) vs Assemblies: @(_AOTAssemblies->Count())" />
 
-   <ItemGroup>
-     <_EmccIncludePaths Include="$(_WasmIntermediateOutputPath.TrimEnd('\/'))" />
-     <_EmccIncludePaths Include="$(_WasmRuntimePackIncludeDir)mono-2.0" />
-     <_EmccIncludePaths Include="$(_WasmRuntimePackIncludeDir)wasm" />
-   </ItemGroup>
+    <ItemGroup>
+      <_EmccIncludePaths Include="$(_WasmIntermediateOutputPath.TrimEnd('\/'))" />
+      <_EmccIncludePaths Include="$(_WasmRuntimePackIncludeDir)mono-2.0" />
+      <_EmccIncludePaths Include="$(_WasmRuntimePackIncludeDir)wasm" />
+    </ItemGroup>
 
-   <PropertyGroup>
-     <EmccCFlags>$(EmccFlags) -DCORE_BINDINGS -DGEN_PINVOKE=1</EmccCFlags>
-     <EmccCFlags>$(EmccCFlags) @(_EmccIncludePaths -> '&quot;-I%(Identity)&quot;', ' ')</EmccCFlags>
-     <EmccCFlags Condition="'$(WasmNativeDebugSymbols)' == 'true'">$(EmccCFlags) -g</EmccCFlags>
+    <PropertyGroup>
+      <EmccCFlags>$(EmccFlags) -DCORE_BINDINGS -DGEN_PINVOKE=1</EmccCFlags>
+      <EmccCFlags>$(EmccCFlags) @(_EmccIncludePaths -> '&quot;-I%(Identity)&quot;', ' ')</EmccCFlags>
+      <EmccCFlags Condition="'$(WasmNativeDebugSymbols)' == 'true'">$(EmccCFlags) -g</EmccCFlags>
 
-     <EmccLDFlags>$(EmccFlags) -s TOTAL_MEMORY=536870912</EmccLDFlags>
-   </PropertyGroup>
+      <EmccLDFlags>$(EmccFlags) -s TOTAL_MEMORY=536870912</EmccLDFlags>
+    </PropertyGroup>
 
     <Message Text="Compiling native assets with emcc. This may take a while ..." Importance="High" />
     <Exec Command='emcc $(EmccCFlags) "%(_WasmObjectsToBuild.Identity)" -c -o "%(_WasmObjectsToBuild.OutputPath)"' EnvironmentVariables="@(EmscriptenEnvVars)" />
-    
+
     <ItemGroup>
       <_EmccLinkerArguments Include="$(EmccLDFlags)" />
       <_EmccLinkerArguments Include="--js-library &quot;%(_DotnetJSSrcFile.Identity)&quot;" />
