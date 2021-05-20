@@ -1328,7 +1328,7 @@ namespace System
         public int CompareTo(System.DateOnly value) { throw null; }
         public int CompareTo(object? value)  { throw null; }
         public bool Equals(System.DateOnly value) { throw null; }
-        public override bool Equals(object? value) { throw null; }
+        public override bool Equals([System.Diagnostics.CodeAnalysis.NotNullWhenAttribute(true)] object? value) { throw null; }
         public override int GetHashCode() { throw null; }
         public static System.DateOnly Parse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider = default, System.Globalization.DateTimeStyles style = System.Globalization.DateTimeStyles.None) { throw null; }
         public static System.DateOnly ParseExact(System.ReadOnlySpan<char> s, System.ReadOnlySpan<char> format, System.IFormatProvider? provider = default, System.Globalization.DateTimeStyles style = System.Globalization.DateTimeStyles.None) { throw null; }
@@ -3845,7 +3845,7 @@ namespace System
         public int CompareTo(System.TimeOnly value) { throw null; }
         public int CompareTo(object? value) { throw null; }
         public bool Equals(System.TimeOnly value) { throw null; }
-        public override bool Equals(object? value) { throw null; }
+        public override bool Equals([System.Diagnostics.CodeAnalysis.NotNullWhenAttribute(true)] object? value) { throw null; }
         public override int GetHashCode() { throw null; }
         public static System.TimeOnly Parse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider = default, System.Globalization.DateTimeStyles style = System.Globalization.DateTimeStyles.None) { throw null; }
         public static System.TimeOnly ParseExact(System.ReadOnlySpan<char> s, System.ReadOnlySpan<char> format, System.IFormatProvider? provider = default, System.Globalization.DateTimeStyles style = System.Globalization.DateTimeStyles.None) { throw null; }
@@ -7886,11 +7886,13 @@ namespace System.Reflection
     {
         protected Assembly() { }
         [System.ObsoleteAttribute("Assembly.CodeBase and Assembly.EscapedCodeBase are only included for .NET Framework compatibility. Use Assembly.Location instead.", DiagnosticId = "SYSLIB0012", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
+        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(Message="The code will throw for assemblies embedded in a single-file app")]
         public virtual string? CodeBase { get { throw null; } }
         public virtual System.Collections.Generic.IEnumerable<System.Reflection.CustomAttributeData> CustomAttributes { get { throw null; } }
         public virtual System.Collections.Generic.IEnumerable<System.Reflection.TypeInfo> DefinedTypes { [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute("Types might be removed")] get { throw null; } }
         public virtual System.Reflection.MethodInfo? EntryPoint { get { throw null; } }
         [System.ObsoleteAttribute("Assembly.CodeBase and Assembly.EscapedCodeBase are only included for .NET Framework compatibility. Use Assembly.Location instead.", DiagnosticId = "SYSLIB0012", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
+        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(Message="The code will throw for assemblies embedded in a single-file app")]
         public virtual string EscapedCodeBase { get { throw null; } }
         public virtual System.Collections.Generic.IEnumerable<System.Type> ExportedTypes { [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute("Types might be removed")] get { throw null; } }
         public virtual string? FullName { get { throw null; } }
@@ -7925,6 +7927,7 @@ namespace System.Reflection
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute("Types might be removed")]
         public virtual System.Type[] GetExportedTypes() { throw null; }
         public virtual System.IO.FileStream? GetFile(string name) { throw null; }
+        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFiles(Message = "The code will throw for assemblies embedded in a single-file app")]
         public virtual System.IO.FileStream[] GetFiles() { throw null; }
         public virtual System.IO.FileStream[] GetFiles(bool getResourceModules) { throw null; }
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute("Types might be removed")]
@@ -8093,10 +8096,11 @@ namespace System.Reflection
     {
         public AssemblyName() { }
         public AssemblyName(string assemblyName) { }
-        public string? CodeBase { get { throw null; } set { } }
+        public string? CodeBase { [System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(Message = "The code will return an empty string for assemblies embedded in a single-file app")] get { throw null; } set { } }
         public System.Reflection.AssemblyContentType ContentType { get { throw null; } set { } }
         public System.Globalization.CultureInfo? CultureInfo { get { throw null; } set { } }
         public string? CultureName { get { throw null; } set { } }
+        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute(Message="The code will return an empty string for assemblies embedded in a single-file app")]
         public string? EscapedCodeBase { get { throw null; } }
         public System.Reflection.AssemblyNameFlags Flags { get { throw null; } set { } }
         public string FullName { get { throw null; } }
@@ -8838,7 +8842,7 @@ namespace System.Reflection
         public unsafe static object Box(void* ptr, System.Type type) { throw null; }
         void System.Runtime.Serialization.ISerializable.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
         public unsafe static void* Unbox(object ptr) { throw null; }
-        public override bool Equals(object? obj) { throw null; }
+        public override bool Equals([System.Diagnostics.CodeAnalysis.NotNullWhenAttribute(true)] object? obj) { throw null; }
         public override int GetHashCode() { throw null; }
     }
     [System.FlagsAttribute]
