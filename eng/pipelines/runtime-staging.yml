@@ -187,7 +187,7 @@ jobs:
 # Build the whole product using Mono and run libraries tests
 #
 #
-# Build the whole product using Mono for Android and run runtime tests with Android emulator
+# Build the whole product using Mono for Android and run runtime tests with Android devices
 #
 #- template: /eng/pipelines/common/platform-matrix.yml
   #parameters:
