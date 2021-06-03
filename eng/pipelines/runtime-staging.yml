@@ -143,7 +143,6 @@ jobs:
       #nameSuffix: Build_Subset_Mono
       #buildArgs: -subset mono+libs
 
-
 #
 # Build the whole product using Mono and run libraries tests
 #
