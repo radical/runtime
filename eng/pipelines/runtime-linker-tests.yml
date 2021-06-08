@@ -43,7 +43,7 @@ pr:
     - SECURITY.md
     - THIRD-PARTY-NOTICES.TXT
 
-jobs:
+#jobs:
 #
 # Build Release config vertical for Windows, Linux, Linux musl and OSX
 #
