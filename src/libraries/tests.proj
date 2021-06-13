@@ -255,13 +255,7 @@
     <!--[> Issue: https://github.com/dotnet/runtime/issues/51722 <]-->
     <!--<ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Linq\tests\System.Linq.Tests.csproj" />-->
 
-    <!--[> Issue: https://github.com/dotnet/runtime/issues/50965 <]-->
-    <!--<ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Text.Encodings.Web\tests\System.Text.Encodings.Web.Tests.csproj" />-->
-
-    <!--[> Issue: https://github.com/dotnet/runtime/issues/51673 <]-->
-    <!--<ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Reflection\tests\System.Reflection.Tests.csproj" />-->
-
-    <!--[> Issue: https://github.com/dotnet/runtime/issues/51678 <]-->
+    <!-- Issue: https://github.com/dotnet/runtime/issues/51678 -->
     <!--<ProjectExclusions Include="$(MSBuildThisFileDirectory)System.Runtime.Loader\tests\System.Runtime.Loader.Tests.csproj" />-->
 
     <!--[> Issue: https://github.com/dotnet/runtime/issues/51676 <]-->
