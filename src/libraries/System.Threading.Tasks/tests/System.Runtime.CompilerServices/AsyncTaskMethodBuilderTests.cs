@@ -407,7 +407,6 @@ namespace System.Threading.Tasks.Tests
         }
 
         [Fact]
-//        [ActiveIssue("https://github.com/dotnet/runtime/issues/50968", typeof(PlatformDetection), nameof(PlatformDetection.IsBrowser), nameof(PlatformDetection.IsMonoAOT))]
         public static void Tcs_ValidateFaultedTask()
         {
             var tcs = new TaskCompletionSource<int>();
@@ -417,7 +416,6 @@ namespace System.Threading.Tasks.Tests
         }
 
         [Fact]
-//        [ActiveIssue("https://github.com/dotnet/runtime/issues/50968", typeof(PlatformDetection), nameof(PlatformDetection.IsBrowser), nameof(PlatformDetection.IsMonoAOT))]
         public static void TaskMethodBuilder_ValidateFaultedTask()
         {
             var atmb = AsyncTaskMethodBuilder.Create();
@@ -427,7 +425,6 @@ namespace System.Threading.Tasks.Tests
         }
 
         [Fact]
-//        [ActiveIssue("https://github.com/dotnet/runtime/issues/50968", typeof(PlatformDetection), nameof(PlatformDetection.IsBrowser), nameof(PlatformDetection.IsMonoAOT))]
         public static void TaskMethodBuilderT_ValidateFaultedTask()
         {
             var atmbtr = AsyncTaskMethodBuilder<object>.Create();
@@ -437,7 +434,6 @@ namespace System.Threading.Tasks.Tests
         }
 
         [Fact]
-//        [ActiveIssue("https://github.com/dotnet/runtime/issues/50968", typeof(PlatformDetection), nameof(PlatformDetection.IsBrowser), nameof(PlatformDetection.IsMonoAOT))]
         public static void TrackedSyncContext_ValidateException()
         {
             SynchronizationContext previousContext = SynchronizationContext.Current;
@@ -650,10 +646,6 @@ namespace System.Threading.Tasks.Tests
         {
             RemoteExecutor.Invoke(() =>
             {
-                // NOTE: This depends on private implementation details generally only used by the debugger.
-                // If those ever change, this test will need to be updated as well.
-                typeof(Task).GetField("s_asyncDebuggingEnabled", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, true);
-
                 for (int i = 0; i < 1000; i++)
                 {
                     static async Task YieldAsync(TaskCompletionSource tcs) => await tcs.Task;
